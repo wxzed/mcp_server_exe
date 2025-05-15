@@ -87,14 +87,8 @@ The server supports the following command line arguments to customize its behavi
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `--mcp-js <路径>` | 自定义MCP配置文件路径 | 内置配置 |
-| `--server-name <名称>` | MCP服务器名称 | mcp_server_exe |
+| `--mcp-js <路径>` | 配置文件路径（包含服务器配置和 MCP 配置） | 内置配置 |
 | `--port <端口>` | 服务器监听端口 | 3000 |
-| `--version <版本号>` | 服务器版本号 | 1.0.0 |
-| `--description <描述>` | 服务器描述信息 | MCP Server for Model Context Protocol |
-| `--author <作者>` | 服务器作者信息 | shadow |
-| `--license <许可证>` | 服务器许可证信息 | MIT |
-| `--homepage <主页>` | 服务器主页URL | https://github.com/shadowcz007/mcp_server.exe |
 
 使用示例：
 
@@ -105,20 +99,81 @@ Example usage:
 # Run server with custom name and port
 node dist/server.js --server-name my-mcp-server --port 8080
 
-# 使用完整配置运行服务器
-# Run server with full configuration
-node dist/server.js --mcp-js ./my-config.js --server-name custom-server --port 8080 --version 2.0.0 --description "My Custom MCP Server" --author "Your Name" --license "Apache-2.0" --homepage "https://example.com/mcp-server"
+# 使用配置文件运行（同时配置服务器和 MCP）
+# Run server with configuration file (both server and MCP config)
+node dist/server.js --mcp-js ./examples/custom-mcp-config.js
 
-# 使用可执行文件和自定义配置
-# Run executable with custom configuration
-./executables/mcp_server --mcp-js ./my-config.js --server-name custom-server --port 8080
+# 使用完整命令行参数运行服务器
+# Run server with full command line arguments
+node dist/server.js --server-name custom-server --port 8080 --version 2.0.0 --description "My Custom MCP Server" --author "Your Name" --license "Apache-2.0" --homepage "https://example.com/mcp-server"
+
+# 使用可执行文件和配置文件
+# Run executable with configuration file
+./executables/mcp_server --mcp-js ./examples/custom-mcp-config.js
 ```
 
-## 自定义配置 | Custom Configuration
+## 综合配置文件 | Unified Configuration File
 
-服务器支持通过命令行参数 `--mcp-js` 加载自定义配置文件：
+服务器支持使用配置文件同时配置服务器参数和 MCP 功能。配置文件可以导出以下内容：
 
-The server supports loading custom configuration files via the command line parameter `--mcp-js`:
+The server supports using a configuration file to configure both server parameters and MCP functionality. The configuration file can export the following:
+
+1. **基本配置对象** - 作为服务器基本配置
+2. **configureServer 函数** - 动态生成服务器配置（优先于基本配置对象）
+3. **configureMcp 函数** - 配置 MCP 服务器的资源、工具和提示
+
+命令行参数的优先级高于配置文件中的设置。
+
+Command line arguments have higher priority than settings in the configuration file.
+
+### 配置文件格式 | Configuration File Format
+
+```javascript
+/**
+ * MCP 服务器综合配置文件
+ */
+module.exports = {
+  // 服务器基本配置（静态）
+  serverName: "custom-mcp-server",
+  port: 8080,
+  version: "1.1.0",
+  description: "自定义 MCP 服务器",
+  author: "yourname",
+  license: "MIT",
+  homepage: "https://example.com/mcp-server",
+  
+  // 动态服务器配置函数（可选，优先于静态配置）
+  configureServer: function() {
+    // 返回服务器配置对象
+    return {
+      serverName: "dynamic-server",
+      // 其他配置...
+    };
+  },
+  
+  // MCP 配置函数
+  configureMcp: function(server, ResourceTemplate, z) {
+    // 配置资源
+    server.resource(/* ... */);
+    
+    // 配置工具
+    server.tool(/* ... */);
+    
+    // 配置提示
+    server.prompt(/* ... */);
+  }
+};
+```
+
+示例配置文件可参考 `examples/custom-mcp-config.js`。
+
+Refer to `examples/custom-mcp-config.js` for a sample configuration file.
+
+## MCP 自定义配置 | MCP Custom Configuration
+
+服务器支持通过命令行参数 `--mcp-js` 加载自定义MCP工具配置文件：
+
+The server supports loading custom MCP tools configuration files via the command line parameter `--mcp-js`:
 
 ```bash
 # 使用开发模式加载自定义配置 | Using development mode with custom config
@@ -174,7 +229,6 @@ The packaged executable files will be generated in the `executables` directory.
 ## 许可证 | License
 
 ISC
-
 ## 环境变量 | Environment Variables
 
 - `PORT` - 服务器端口号（默认：3000）| Server port (default: 3000)

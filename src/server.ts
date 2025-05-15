@@ -7,115 +7,160 @@ const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { defaultConfig, loadServerConfig, defaultConfigureMcp } = require('./tools/serverConfig.js');
 
-// Parse command line arguments
+// 解析命令行参数
 const args = process.argv.slice(2);
 let customConfigPath = null;
-let mcpServerName = null;
-let port = 3000;
-let version = "1.0.0";
-let description = "MCP Server for Model Context Protocol";
-let author = "shadow";
-let license = "MIT";
-let homepage = "https://github.com/shadowcz007/mcp_server.exe";
- 
 
+// 定义 cliArgs 接口
+interface CliArgs {
+  serverName?: string;
+  port?: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  license?: string;
+  homepage?: string;
+}
+
+// 创建 cliArgs 对象
+let cliArgs: CliArgs = {};
+
+// 处理命令行参数
 for (let i = 0; i < args.length; i++) {
+  // 只使用 --mcp-js 参数
   if (args[i] === '--mcp-js' && i + 1 < args.length) {
     customConfigPath = args[i + 1];
     i++; // 跳过下一个参数，因为它是配置文件路径
     continue;
   }
   if (args[i] === '--server-name' && i + 1 < args.length) {
-    mcpServerName = args[i + 1];
-    i++; // 跳过下一个参数，因为它是服务器名称
-    continue;
-  }
-  if (args[i] === '--version' && i + 1 < args.length) {
-    version = args[i + 1];
-    i++; // 跳过下一个参数，因为它是版本号
+    cliArgs.serverName = args[i + 1];
+    i++; 
     continue;
   }
   if (args[i] === '--port' && i + 1 < args.length) {
-    port = parseInt(args[i + 1]);
-    i++; // 跳过下一个参数，因为它是端口号
+    cliArgs.port = args[i + 1];
+    i++; 
+    continue;
+  }
+  if (args[i] === '--version' && i + 1 < args.length) {
+    cliArgs.version = args[i + 1];
+    i++; 
     continue;
   }
   if (args[i] === '--description' && i + 1 < args.length) {
-    description = args[i + 1];
-    i++; // 跳过下一个参数，因为它是描述
+    cliArgs.description = args[i + 1];
+    i++; 
     continue;
   }
   if (args[i] === '--author' && i + 1 < args.length) {
-    author = args[i + 1];
-    i++; // 跳过下一个参数，因为它是作者
+    cliArgs.author = args[i + 1];
+    i++; 
     continue;
   }
   if (args[i] === '--license' && i + 1 < args.length) { 
-    license = args[i + 1];
-    i++; // 跳过下一个参数，因为它是许可证
+    cliArgs.license = args[i + 1];
+    i++; 
     continue;
   }
   if (args[i] === '--homepage' && i + 1 < args.length) {
-    homepage = args[i + 1];
-    i++; // 跳过下一个参数，因为它是主页
+    cliArgs.homepage = args[i + 1];
+    i++; 
     continue;
   }
-  
 }
 
-// Default or custom configuration
-let configureMcp;
+// 加载配置文件
+let customConfig = {};
+let configureMcp = null;
+
 if (customConfigPath && fs.existsSync(customConfigPath)) {
   const customConfigFullPath = path.resolve(process.cwd(), customConfigPath);
-  console.log(`Loading custom MCP config from: ${customConfigFullPath}`);
-  configureMcp = require(customConfigFullPath).configureMcp;
-} else {
-  console.log('Using default MCP config');
+  console.log(`加载配置文件: ${customConfigFullPath}`);
+  
+  try {
+    const customModule = require(customConfigFullPath);
+    
+    // 加载服务器配置
+    if (typeof customModule === 'object') {
+      // 如果导出的是一个对象，直接作为服务器配置
+      customConfig = customModule;
+    }
+    
+    // 检查并加载 configureServer 函数
+    if (customModule.configureServer && typeof customModule.configureServer === 'function') {
+      // 如果存在 configureServer 函数，则调用它获取服务器配置
+      console.log('发现 configureServer 函数，使用其返回值作为服务器配置');
+      const serverConfig = customModule.configureServer();
+      if (serverConfig && typeof serverConfig === 'object') {
+        customConfig = serverConfig;
+      }
+    }
+    
+    // 检查并加载 configureMcp 函数
+    if (customModule.configureMcp && typeof customModule.configureMcp === 'function') {
+      // 如果存在 configureMcp 函数，则使用它配置 MCP 服务器
+      console.log('发现 configureMcp 函数，将用于配置 MCP 服务器');
+      configureMcp = customModule.configureMcp;
+    }
+  } catch (error) {
+    console.error(`加载配置文件失败: ${error.message}`);
+  }
+}
+
+// 如果没有找到 configureMcp 函数，则使用默认的
+if (!configureMcp) {
+  console.log('使用默认 MCP 配置');
   configureMcp = require('./tools/mcpConfig.js').configureMcp;
 }
 
+// 合并配置
+const config = loadServerConfig(customConfig, cliArgs);
+
+// 创建MCP服务器实例
 const server = new McpServer({
-  name: mcpServerName || "mcp_server_exe",
-  version: version || "1.0.0",
-  description: description || "MCP Server for Model Context Protocol",
-  author: author || "shadow",
-  license: license || "MIT",
-  homepage: homepage || "https://github.com/shadowcz007/mcp_server.exe"
+  name: config.serverName,
+  version: config.version,
+  description: config.description,
+  author: config.author,
+  license: config.license,
+  homepage: config.homepage
 });
 
-// Configure MCP server with tools, resources, and prompts
+// 配置MCP服务器的工具、资源和提示
 configureMcp(server, ResourceTemplate, z);
 
 const app = express();
 
-// Configure CORS
+// 配置CORS
 const corsOptions = {
-  origin: '*', // Allow all origins, consider setting specific domains in production
+  origin: '*', // 允许所有来源，生产环境中应考虑设置特定域名
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true, // Allow credentials
-  maxAge: 86400 // Preflight request cache time in seconds
+  credentials: true, // 允许凭据
+  maxAge: 86400 // 预检请求缓存时间（秒）
 };
 
-// Enable CORS
+// 启用CORS
 app.use(cors(corsOptions));
 
-// Enable JSON parsing
+// 启用JSON解析
 app.use(express.json());
 
-// Store transports for each session type
+// 存储每种会话类型的传输
 const transports = {
   streamable: new Map(),
   sse: new Map()
 };
 
-// Modern Streamable HTTP endpoint
+// 现代化Streamable HTTP端点
 app.all('/mcp', async (req, res) => {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => uuidv4(),
     onsessioninitialized: (sessionId) => {
-      console.log(`New session initialized: ${sessionId}`);
+      console.log(`新会话已初始化: ${sessionId}`);
     }
   });
   
@@ -133,7 +178,7 @@ app.all('/mcp', async (req, res) => {
   }
 });
 
-// Legacy SSE endpoint for older clients
+// 传统SSE端点（用于旧版客户端）
 app.get('/sse', async (req, res) => {
   const transport = new SSEServerTransport('/messages', res);
   if (transport.sessionId) {
@@ -149,35 +194,27 @@ app.get('/sse', async (req, res) => {
   }
 });
 
-// Legacy message endpoint for older clients
+// 传统消息端点（用于旧版客户端）
 app.post('/messages', async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.sse.get(sessionId);
   if (transport) {
     await transport.handlePostMessage(req, res, req.body);
   } else {
-    res.status(400).send('No transport found for sessionId');
+    res.status(400).send('未找到会话ID对应的传输');
   }
 });
 
-const PORT = process.env.PORT || port;
+const PORT = process.env.PORT || config.port;
 app.listen(PORT, () => {
 
-  let config={"mcpServers":{}};
+  let mcpConfig = {"mcpServers":{}};
 
-  if(mcpServerName){
-    config["mcpServers"][mcpServerName]={
-      "url": `http://127.0.0.1:${PORT}/sse`
-    }
-  } else {
-    config["mcpServers"]["mcp_server_exe"]={
-      "url": `http://127.0.0.1:${PORT}/sse`
-    }
-  }
+  mcpConfig["mcpServers"][config.serverName] = {
+    "url": `http://127.0.0.1:${PORT}/sse`
+  };
 
-  console.log(`\nMCP Server config is: ${JSON.stringify(config,null,2)}`);
-
-  console.log(`\nMCP Server streamable is running on port ${PORT}/mcp`);
-  console.log(`\nMCP Server sse is running on port ${PORT}/sse`);
-   
+  console.log(`\nMCP服务器配置: ${JSON.stringify(mcpConfig, null, 2)}`);
+  console.log(`\nMCP服务器(streamable)运行在端口 ${PORT}/mcp`);
+  console.log(`\nMCP服务器(sse)运行在端口 ${PORT}/sse`);
 }); 
