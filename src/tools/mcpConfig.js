@@ -1,6 +1,5 @@
 /**
  * 配置MCP服务器的资源、工具和提示
-
  */
 function configureMcp(server, ResourceTemplate, z) {
     // 配置Echo资源
@@ -26,7 +25,7 @@ function configureMcp(server, ResourceTemplate, z) {
                 return {
                     contents: [{
                         uri: uri.href,
-                        text: 'test'
+                        text: 'github.com/shadowcz007/mcp_server.exe'
                     }]
                 };
             } finally {
@@ -57,9 +56,7 @@ function configureMcp(server, ResourceTemplate, z) {
             }]
         })
     );
-
     // 可以在这里添加更多工具、资源和提示的配置
-
 }
 
 module.exports = { configureMcp };

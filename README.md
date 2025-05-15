@@ -1,13 +1,12 @@
-# MCP Server
+# MCP Server.exe
 
-这是一个支持现代和传统客户端的 MCP (Model Context Protocol) 服务器实现。
+把 MCP (Model Context Protocol) 服务器制作成可执行文件，支持现代和传统客户端连接。
 
-## 功能特点
+## 功能特性
 
-- 支持现代 Streamable HTTP 传输
-- 支持传统 SSE (Server-Sent Events) 传输
-- 提供完整的会话管理
-- 可打包为独立的可执行文件
+- 支持现代 Streamable HTTP 端点 (/mcp)
+- 支持传统 SSE 端点 (/sse) 和消息端点 (/messages)
+- 可自定义配置工具、资源和提示
 
 ## 安装
 
@@ -15,39 +14,73 @@
 npm install
 ```
 
-## 开发
+## 构建
 
 ```bash
-# 开发模式运行
-npm run dev
-
-# 构建项目
 npm run build
+```
 
-# 运行构建后的项目
+## 运行
+
+```bash
 npm start
 ```
 
-## 打包为可执行文件
+或者开发模式：
 
 ```bash
-# 构建项目
-npm run build
-
-# 打包为可执行文件
-npm run package
+npm run dev
 ```
 
-打包后的可执行文件将位于 `executables` 目录下，支持以下平台：
-- Windows (x64)
-- macOS (x64)
-- Linux (x64)
+## 自定义配置
+
+服务器支持通过命令行参数 `--mcp-js` 加载自定义配置文件：
+
+```bash
+# 使用开发模式加载自定义配置
+node src/server.ts --mcp-js ./examples/custom-mcp-config.js
+
+# 使用构建后的程序加载自定义配置
+node dist/server.js --mcp-js ./examples/custom-mcp-config.js
+
+# 直接使用打包后的可执行文件加载自定义配置
+./executables/mcp_server --mcp-js ./examples/custom-mcp-config.js
+```
+
+### 自定义配置文件格式
+
+自定义配置文件应导出 `configureMcp` 函数，该函数接收三个参数：
+- `server`: MCP 服务器实例
+- `ResourceTemplate`: 用于定义资源模板的类
+- `z`: Zod 验证库实例
+
+示例配置文件可参考 `examples/custom-mcp-config.js`。
+
+## 打包
+
+为 macOS 打包：
+
+```bash
+npm run package-mac
+```
+
+为 Windows 打包：
+
+```bash
+npm run package-win
+```
+
+打包后的可执行文件将生成在 `executables` 目录中。
 
 ## API 端点
 
-- `/mcp` - 现代 Streamable HTTP 端点
-- `/sse` - 传统 SSE 端点
-- `/messages` - 传统消息端点
+- `/mcp`: 现代 Streamable HTTP 端点
+- `/sse`: 传统 SSE 端点
+- `/messages`: 传统消息端点
+
+## 许可证
+
+ISC
 
 ## 环境变量
 

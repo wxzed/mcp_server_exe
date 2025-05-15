@@ -5,7 +5,30 @@ const { SSEServerTransport } = require("@modelcontextprotocol/sdk/server/sse.js"
 const { z } = require('zod');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
-const { configureMcp } = require('./tools/mcpConfig.js');
+const fs = require('fs');
+const path = require('path');
+
+// 解析命令行参数
+const args = process.argv.slice(2);
+let customConfigPath = null;
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--mcp-js' && i + 1 < args.length) {
+    customConfigPath = args[i + 1];
+    break;
+  }
+}
+
+// 默认配置或自定义配置
+let configureMcp;
+if (customConfigPath && fs.existsSync(customConfigPath)) {
+  const customConfigFullPath = path.resolve(process.cwd(), customConfigPath);
+  console.log(`Loading custom MCP config from: ${customConfigFullPath}`);
+  configureMcp = require(customConfigFullPath).configureMcp;
+} else {
+  console.log('Using default MCP config');
+  configureMcp = require('./tools/mcpConfig.js').configureMcp;
+}
 
 const server = new McpServer({
   name: "backwards-compatible-server",
@@ -13,7 +36,7 @@ const server = new McpServer({
 });
 
 // 配置MCP服务器的工具、资源和提示
-configureMcp(server,ResourceTemplate,z);
+configureMcp(server, ResourceTemplate, z);
 
 const app = express();
 
