@@ -3,12 +3,12 @@
     "version": "1.0.0",
     "description": "MCP Server with backwards compatibility",
     "main": "dist/server.js",
-    "type": "module",
     "scripts": {
         "build": "tsc",
         "start": "node dist/server.js",
-        "dev": "node --import tsx src/server.ts",
-        "package": "pkg .",
+        "dev": "tsx src/server.ts",
+        "package-mac": "pkg . --targets node18-macos-x64 --output executables/mcp_server",
+        "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server.exe",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "bin": "dist/server.js",

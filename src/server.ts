@@ -1,10 +1,9 @@
-import express from "express";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { Request, Response } from "express";
-import { v4 as uuidv4 } from 'uuid';
-import cors from 'cors';
+const express = require("express");
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
+const { SSEServerTransport } = require("@modelcontextprotocol/sdk/server/sse.js");
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 const server = new McpServer({
   name: "backwards-compatible-server",
@@ -30,12 +29,12 @@ app.use(express.json());
 
 // Store transports for each session type
 const transports = {
-  streamable: new Map<string, StreamableHTTPServerTransport>(),
-  sse: new Map<string, SSEServerTransport>()
+  streamable: new Map(),
+  sse: new Map()
 };
 
 // Modern Streamable HTTP endpoint
-app.all('/mcp', async (req: Request, res: Response) => {
+app.all('/mcp', async (req, res) => {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => uuidv4(),
     onsessioninitialized: (sessionId) => {
@@ -58,7 +57,7 @@ app.all('/mcp', async (req: Request, res: Response) => {
 });
 
 // Legacy SSE endpoint for older clients
-app.get('/sse', async (req: Request, res: Response) => {
+app.get('/sse', async (req, res) => {
   const transport = new SSEServerTransport('/messages', res);
   if (transport.sessionId) {
     transports.sse.set(transport.sessionId, transport);
@@ -74,8 +73,8 @@ app.get('/sse', async (req: Request, res: Response) => {
 });
 
 // Legacy message endpoint for older clients
-app.post('/messages', async (req: Request, res: Response) => {
-  const sessionId = req.query.sessionId as string;
+app.post('/messages', async (req, res) => {
+  const sessionId = req.query.sessionId;
   const transport = transports.sse.get(sessionId);
   if (transport) {
     await transport.handlePostMessage(req, res, req.body);
