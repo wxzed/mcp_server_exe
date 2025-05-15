@@ -1,7 +1,7 @@
 {
     "name": "mcp_server.exe",
-    "version": "1.0.0",
-    "description": "MCP Server with backwards compatibility",
+    "version": "0.1.1",
+    "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
     "scripts": {
         "build": "tsc",
@@ -9,7 +9,6 @@
         "dev": "tsx src/server.ts",
         "package-mac": "pkg . --targets node18-macos-x64 --output executables/mcp_server",
         "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server.exe",
-        "test": "echo \"Error: no test specified\" && exit 1",
         "start-with-config": "node dist/server.js --mcp-js ./path/to/config.js",
         "test-custom-config": "node scripts/test-custom-config.js",
         "test-packaged-app": "node scripts/test-packaged-app.js"
@@ -26,9 +25,9 @@
             "src/**/*"
         ]
     },
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
+    "keywords": ["mcp", "server", "executable", "mcp_server.exe"],
+    "author": "shadow",
+    "license": "MIT",
     "bugs": {
         "url": "https://github.com/shadowcz007/mcp_server.exe/issues"
     },

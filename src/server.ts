@@ -8,7 +8,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
-// 解析命令行参数
+// Parse command line arguments
 const args = process.argv.slice(2);
 let customConfigPath = null;
 
@@ -19,7 +19,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-// 默认配置或自定义配置
+// Default or custom configuration
 let configureMcp;
 if (customConfigPath && fs.existsSync(customConfigPath)) {
   const customConfigFullPath = path.resolve(process.cwd(), customConfigPath);
@@ -35,24 +35,24 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// 配置MCP服务器的工具、资源和提示
+// Configure MCP server with tools, resources, and prompts
 configureMcp(server, ResourceTemplate, z);
 
 const app = express();
 
-// 配置 CORS
+// Configure CORS
 const corsOptions = {
-  origin: '*', // 允许所有来源访问，生产环境建议设置具体的域名
+  origin: '*', // Allow all origins, consider setting specific domains in production
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true, // 允许携带凭证
-  maxAge: 86400 // 预检请求结果缓存时间，单位：秒
+  credentials: true, // Allow credentials
+  maxAge: 86400 // Preflight request cache time in seconds
 };
 
-// 启用 CORS
+// Enable CORS
 app.use(cors(corsOptions));
 
-// 启用 JSON 解析
+// Enable JSON parsing
 app.use(express.json());
 
 // Store transports for each session type

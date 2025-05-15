@@ -1,11 +1,11 @@
 /**
- * 配置MCP服务器的资源、工具和提示
+ * Configure MCP server resources, tools, and prompts
  */
 function configureMcp(server, ResourceTemplate, z) {
-    // 配置Echo资源
+    // Configure Echo resource
     server.resource(
         "echo",
-        // 资源模板应该在server中定义，这里只提供参数
+        // Resource templates should be defined in the server, only parameters are provided here
         new ResourceTemplate("echo://{message}", { list: undefined }),
         async(uri, { message }) => ({
             contents: [{
@@ -35,7 +35,7 @@ function configureMcp(server, ResourceTemplate, z) {
     );
 
 
-    // 配置Echo工具
+    // Configure Echo tool
     server.tool(
         "echo", { message: z.string() },
         async({ message }) => ({
@@ -43,7 +43,7 @@ function configureMcp(server, ResourceTemplate, z) {
         })
     );
 
-    // 配置Echo提示
+    // Configure Echo prompt
     server.prompt(
         "echo", { message: z.string() },
         ({ message }) => ({
@@ -56,7 +56,7 @@ function configureMcp(server, ResourceTemplate, z) {
             }]
         })
     );
-    // 可以在这里添加更多工具、资源和提示的配置
+    // Add more tool, resource, and prompt configurations here
 }
 
 module.exports = { configureMcp };

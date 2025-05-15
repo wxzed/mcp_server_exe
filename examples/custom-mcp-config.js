@@ -1,29 +1,29 @@
 /**
- * 自定义MCP配置示例文件
- * 用法: mcp_server --mcp-js ./custom-mcp-config.js
+ * Custom MCP configuration example file
+ * Usage: mcp_server --mcp-js ./custom-mcp-config.js
  */
 function configureMcp(server, ResourceTemplate, z) {
-    // 配置自定义Echo资源
+    // Configure custom Echo resource
     server.resource(
         "custom-echo",
         new ResourceTemplate("custom-echo://{message}", { list: undefined }),
         async(uri, { message }) => ({
             contents: [{
                 uri: uri.href,
-                text: `自定义资源响应: ${message}`
+                text: `custom resource echo: ${message}`
             }]
         })
     );
 
-    // 配置自定义工具
+    // Configure custom tool
     server.tool(
         "custom-tool", { message: z.string() },
         async({ message }) => ({
-            content: [{ type: "text", text: `自定义工具响应: ${message}` }]
+            content: [{ type: "text", text: `custom tool response: ${message}` }]
         })
     );
 
-    // 配置自定义提示
+    // Configure custom prompt
     server.prompt(
         "custom-prompt", { message: z.string() },
         ({ message }) => ({
@@ -31,13 +31,13 @@ function configureMcp(server, ResourceTemplate, z) {
                 role: "user",
                 content: {
                     type: "text",
-                    text: `自定义提示处理消息: ${message}`
+                    text: `custom prompt process message: ${message}`
                 }
             }]
         })
     );
 
-    // 可以在这里添加更多工具、资源和提示的配置
+    // Add more tool, resource, and prompt configurations here
 }
 
 module.exports = { configureMcp };
