@@ -1,14 +1,19 @@
 const express = require("express");
-const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { McpServer,ResourceTemplate } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
 const { SSEServerTransport } = require("@modelcontextprotocol/sdk/server/sse.js");
+const { z } = require('zod');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
+const { configureMcp } = require('./tools/mcpConfig.js');
 
 const server = new McpServer({
   name: "backwards-compatible-server",
   version: "1.0.0"
 });
+
+// 配置MCP服务器的工具、资源和提示
+configureMcp(server,ResourceTemplate,z);
 
 const app = express();
 
@@ -85,6 +90,6 @@ app.post('/messages', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`CORS is enabled with options:`, corsOptions);
+  console.log(`MCP Server sse is running on port ${PORT}/sse`);
+  console.log(`MCP Server mcp is running on port ${PORT}/mcp`);
 }); 
