@@ -50,8 +50,21 @@ module.exports = { configureMcp };`;
 console.log('Starting server with custom config...');
 const serverPath = path.join(__dirname, '../dist/server.js');
 
+// 定义完整的服务器参数
+const serverArgs = [
+    serverPath,
+    '--mcp-js', customConfigPath,
+    '--server-name', 'shadow-mcp-server',
+    '--port', '6678',
+    '--version', '1.1.0',
+    '--description', 'Custom MCP Server for testing',
+    '--author', 'Shadow Tester',
+    '--license', 'MIT',
+    '--homepage', 'https://github.com/shadowcz007/mcp_server.exe/examples'
+];
+
 // 启动服务器进程
-const server = spawn('node', [serverPath, '--mcp-js', customConfigPath, '--server-name', 'shadow-mcp-server', '--port', '6678'], {
+const server = spawn('node', serverArgs, {
     stdio: 'inherit',
     shell: true
 });

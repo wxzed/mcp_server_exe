@@ -13,6 +13,12 @@ const args = process.argv.slice(2);
 let customConfigPath = null;
 let mcpServerName = null;
 let port = 3000;
+let version = "1.0.0";
+let description = "MCP Server for Model Context Protocol";
+let author = "shadow";
+let license = "MIT";
+let homepage = "https://github.com/shadowcz007/mcp_server.exe";
+ 
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--mcp-js' && i + 1 < args.length) {
@@ -25,11 +31,37 @@ for (let i = 0; i < args.length; i++) {
     i++; // 跳过下一个参数，因为它是服务器名称
     continue;
   }
+  if (args[i] === '--version' && i + 1 < args.length) {
+    version = args[i + 1];
+    i++; // 跳过下一个参数，因为它是版本号
+    continue;
+  }
   if (args[i] === '--port' && i + 1 < args.length) {
     port = parseInt(args[i + 1]);
     i++; // 跳过下一个参数，因为它是端口号
     continue;
   }
+  if (args[i] === '--description' && i + 1 < args.length) {
+    description = args[i + 1];
+    i++; // 跳过下一个参数，因为它是描述
+    continue;
+  }
+  if (args[i] === '--author' && i + 1 < args.length) {
+    author = args[i + 1];
+    i++; // 跳过下一个参数，因为它是作者
+    continue;
+  }
+  if (args[i] === '--license' && i + 1 < args.length) { 
+    license = args[i + 1];
+    i++; // 跳过下一个参数，因为它是许可证
+    continue;
+  }
+  if (args[i] === '--homepage' && i + 1 < args.length) {
+    homepage = args[i + 1];
+    i++; // 跳过下一个参数，因为它是主页
+    continue;
+  }
+  
 }
 
 // Default or custom configuration
@@ -44,8 +76,12 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
 }
 
 const server = new McpServer({
-  name: "backwards-compatible-server",
-  version: "1.0.0"
+  name: mcpServerName || "mcp_server_exe",
+  version: version || "1.0.0",
+  description: description || "MCP Server for Model Context Protocol",
+  author: author || "shadow",
+  license: license || "MIT",
+  homepage: homepage || "https://github.com/shadowcz007/mcp_server.exe"
 });
 
 // Configure MCP server with tools, resources, and prompts
