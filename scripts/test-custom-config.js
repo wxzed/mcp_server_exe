@@ -51,7 +51,7 @@ console.log('Starting server with custom config...');
 const serverPath = path.join(__dirname, '../dist/server.js');
 
 // 启动服务器进程
-const server = spawn('node', [serverPath, '--mcp-js', customConfigPath], {
+const server = spawn('node', [serverPath, '--mcp-js', customConfigPath, '--server-name', 'shadow-mcp-server', '--port', '6678'], {
     stdio: 'inherit',
     shell: true
 });

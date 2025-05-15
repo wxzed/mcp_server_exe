@@ -11,11 +11,24 @@ const path = require('path');
 // Parse command line arguments
 const args = process.argv.slice(2);
 let customConfigPath = null;
+let mcpServerName = null;
+let port = 3000;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--mcp-js' && i + 1 < args.length) {
     customConfigPath = args[i + 1];
-    break;
+    i++; // 跳过下一个参数，因为它是配置文件路径
+    continue;
+  }
+  if (args[i] === '--server-name' && i + 1 < args.length) {
+    mcpServerName = args[i + 1];
+    i++; // 跳过下一个参数，因为它是服务器名称
+    continue;
+  }
+  if (args[i] === '--port' && i + 1 < args.length) {
+    port = parseInt(args[i + 1]);
+    i++; // 跳过下一个参数，因为它是端口号
+    continue;
   }
 }
 
@@ -111,8 +124,24 @@ app.post('/messages', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || port;
 app.listen(PORT, () => {
-  console.log(`MCP Server sse is running on port ${PORT}/sse`);
-  console.log(`MCP Server mcp is running on port ${PORT}/mcp`);
+
+  let config={"mcpServers":{}};
+
+  if(mcpServerName){
+    config["mcpServers"][mcpServerName]={
+      "url": `http://127.0.0.1:${PORT}/sse`
+    }
+  } else {
+    config["mcpServers"]["mcp_server_exe"]={
+      "url": `http://127.0.0.1:${PORT}/sse`
+    }
+  }
+
+  console.log(`\nMCP Server config is: ${JSON.stringify(config,null,2)}`);
+
+  console.log(`\nMCP Server streamable is running on port ${PORT}/mcp`);
+  console.log(`\nMCP Server sse is running on port ${PORT}/sse`);
+   
 }); 

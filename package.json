@@ -6,7 +6,7 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/server.js",
-        "dev": "tsx src/server.ts",
+        "dev": "tsx src/server.ts --server-name shadow-mcp-server --port 3000",
         "package-mac": "pkg . --targets node18-macos-x64 --output executables/mcp_server",
         "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server.exe",
         "start-with-config": "node dist/server.js --mcp-js ./path/to/config.js",
