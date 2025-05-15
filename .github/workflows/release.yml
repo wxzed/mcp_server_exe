@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # 当推送带v前缀的标签时触发，例如v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Package for Windows
+        run: npm run package-win
+
+      - name: Package for macOS (Intel)
+        run: npm run package-mac-intel
+
+      - name: Package for macOS (Apple Silicon)
+        run: npm run package-mac-arm
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            executables/mcp_server-win-x64.exe
+            executables/mcp_server-macos-x64
+            executables/mcp_server-macos-arm64
+          body: |
+            ## MCP Server Release ${{ github.ref_name }}
+            
+            ### 可执行文件
+            - **Windows x64**: `mcp_server-win-x64.exe`
+            - **macOS Intel x64**: `mcp_server-macos-x64`
+            - **macOS Apple Silicon (M系列)**: `mcp_server-macos-arm64`
+            
+            ### 安装说明
+            下载对应您操作系统和架构的可执行文件即可直接运行。 
