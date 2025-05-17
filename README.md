@@ -69,29 +69,6 @@ Turn MCP (Model Context Protocol) server into an executable file, supporting bot
 - Support for combining multiple MCP services
 - Support for both SSE and stdio transport modes
 
-## 安装 | Installation
-
-```bash
-npm install
-```
-
-## 构建 | Build
-
-```bash
-npm run build
-```
-
-## 运行 | Run
-
-```bash
-npm start
-```
-
-或者开发模式 | Or development mode:
-
-```bash
-npm run dev
-```
 
 ## 命令行参数 | Command Line Arguments
 
@@ -111,26 +88,6 @@ The server supports the following command line arguments to customize its behavi
 Example usage:
 
 ```bash
-# 使用自定义名称和端口运行服务器
-# Run server with custom name and port
-node dist/server.js --server-name my-mcp-server --port 8080
-
-# 使用配置文件运行（同时配置服务器和 MCP）
-# Run server with configuration file (both server and MCP config)
-node dist/server.js --mcp-js ./examples/custom-mcp-config.js
-
-# 使用 MCP 配置文件组合多个服务
-# Combine multiple MCP services using config file
-node dist/server.js --mcp-config ./examples/mcp-services.json
-
-# 使用 stdio 传输模式运行
-# Run server with stdio transport mode
-node dist/server.js --transport stdio
-
-# 使用完整命令行参数运行服务器
-# Run server with full command line arguments
-node dist/server.js --server-name custom-server --port 8080 --version 2.0.0 --description "My Custom MCP Server" --author "Your Name" --license "Apache-2.0" --homepage "https://example.com/mcp-server" --transport stdio --mcp-config ./examples/mcp-services.json
-
 # 使用可执行文件和配置文件
 # Run executable with configuration file
 ./executables/mcp_server --mcp-js ./examples/custom-mcp-config.js --mcp-config ./examples/mcp-services.json
@@ -200,12 +157,6 @@ Refer to `examples/custom-mcp-config.js` for a sample configuration file.
 The server supports loading custom MCP tools configuration files via the command line parameter `--mcp-js`:
 
 ```bash
-# 使用开发模式加载自定义配置 | Using development mode with custom config
-node src/server.ts --mcp-js ./examples/custom-mcp-config.js
-
-# 使用构建后的程序加载自定义配置 | Using built program with custom config
-node dist/server.js --mcp-js ./examples/custom-mcp-config.js
-
 # 直接使用打包后的可执行文件加载自定义配置 | Using packaged executable with custom config
 ./executables/mcp_server --mcp-js ./examples/custom-mcp-config.js
 ```
@@ -226,6 +177,33 @@ The custom configuration file should export a `configureMcp` function that accep
 
 Refer to `examples/custom-mcp-config.js` for a sample configuration file.
 
+
+## 开发 | Development
+
+## 安装 | Installation
+
+```bash
+npm install
+```
+
+## 构建 | Build
+
+```bash
+npm run build
+```
+
+## 运行 | Run
+
+```bash
+npm start
+```
+
+或者开发模式 | Or development mode:
+
+```bash
+npm run dev
+```
+
 ## 打包 | Packaging
 
 为 macOS 打包 | Package for macOS:
@@ -244,15 +222,11 @@ npm run package-win
 
 The packaged executable files will be generated in the `executables` directory.
 
-## API 端点 | API Endpoints
-
-- `/mcp`: 现代 Streamable HTTP 端点 | Modern Streamable HTTP endpoint
-- `/sse`: 传统 SSE 端点 | Legacy SSE endpoint
-- `/messages`: 传统消息端点 | Legacy message endpoint
 
 ## 许可证 | License
 
-ISC
+MIT
+
 ## 环境变量 | Environment Variables
 
 - `PORT` - 服务器端口号（默认：3000）| Server port (default: 3000)
