@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+      "Model Server 1": {
+        "url": "http://127.0.0.1:9090"
+      },
+      "Model Server - stdio": {
+        "command":
+          "C:/Users/38957/Documents/mcp_server-win-x64.exe",
+        "args": ["--transport", "stdio"]
+      }
+    }
+  }
