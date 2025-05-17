@@ -15,32 +15,25 @@ const routerServer = new McpRouterServer(serverInfo, {
 })
 
 // 3. 配置目标服务器
-const targetServers: McpServerType[] = [
-  {
-    type: 'sse',
-    url: 'http://localhost:9090',
-    name: 'Model Server 1',
-    version: '1.0.0',
-    description: '第一个模型服务器'
-  },
-  {
-    type: 'stdio',
-    params: {
+
+const config = {
+  mcpServers: {
+    'Model Server 1': {
+      url: 'http://127.0.0.1:9090'
+    },
+    'Model Server - stdio': {
       command:
         'C:/Users/38957/Documents/GitHub/mcp_server.exe/executables/mcp_server-win-x64.exe',
       args: ['--transport', 'stdio']
-    },
-    name: 'Model Server - stdio',
-    version: '1.0.0',
-    description: '第二个模型服务器'
+    }
   }
-]
+}
 
 // 4. 加载目标服务器并启动路由服务器
 async function startServer () {
   try {
     // 加载所有目标服务器
-    await routerServer.add(targetServers)
+    await routerServer.importMcpConfig(config)
 
     // 启动服务器
     routerServer.start()
