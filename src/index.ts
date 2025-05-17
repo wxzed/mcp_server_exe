@@ -1,46 +1,52 @@
-import { McpRouterServer } from './mcpRouterServer';
-
+import { McpRouterServer } from './mcpRouterServer'
+import type { McpServerType } from './utils/schemas'
 // 1. 首先创建服务器信息
 const serverInfo = {
-  name: "MCP Router",
-  version: "1.0.0",
-  description: "Model Context Protocol Router Server",
-  supportedProtocolVersions: ["1.0.0"]
-};
+  name: 'MCP Router',
+  version: '1.0.0',
+  description: 'Model Context Protocol Router Server',
+  supportedProtocolVersions: ['1.0.0']
+}
 
 // 2. 创建路由服务器实例
 const routerServer = new McpRouterServer(serverInfo, {
-  port: 3001,          // 可选，默认为 3001
-  host: "0.0.0.0"      // 可选，默认为 "0.0.0.0"
-});
+  port: 3001, // 可选，默认为 3001
+  host: '0.0.0.0' // 可选，默认为 "0.0.0.0"
+})
 
 // 3. 配置目标服务器
-const targetServers = [
+const targetServers: McpServerType[] = [
   {
-    url: "http://localhost:9090",
-    name: "Model Server 1",
-    version: "1.0.0",
-    description: "第一个模型服务器"
+    type: 'sse',
+    url: 'http://localhost:9090',
+    name: 'Model Server 1',
+    version: '1.0.0',
+    description: '第一个模型服务器'
   },
   {
-    url: "http://localhost:3000/sse",
-    name: "Model Server 2",
-    version: "1.0.0",
-    description: "第二个模型服务器"
+    type: 'stdio',
+    params: {
+      command:
+        'C:/Users/38957/Documents/GitHub/mcp_server.exe/executables/mcp_server-win-x64.exe',
+      args: ['--transport', 'stdio']
+    },
+    name: 'Model Server - stdio',
+    version: '1.0.0',
+    description: '第二个模型服务器'
   }
-];
+]
 
 // 4. 加载目标服务器并启动路由服务器
-async function startServer() {
+async function startServer () {
   try {
     // 加载所有目标服务器
-    await routerServer.add(targetServers);
-    
+    await routerServer.add(targetServers)
+
     // 启动服务器
-    routerServer.start();
+    routerServer.start()
   } catch (error) {
-    console.error("启动服务器时发生错误:", error);
+    console.error('启动服务器时发生错误:', error)
   }
 }
 
-startServer();
+startServer()

@@ -10,10 +10,19 @@ import type {
   Resource,
   Prompt
 } from '@modelcontextprotocol/sdk/types.js'
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { SSEClientTransport,type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js'
+import { StdioClientTransport, type StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
+
+type ConnectionConfig = {
+  type: 'sse'
+  url: URL,
+  params: SSEClientTransportOptions
+} | {
+  type: 'stdio'
+  params: StdioServerParameters
+}
 
 export class McpServerComposer {
   public readonly server: McpServer
@@ -21,7 +30,7 @@ export class McpServerComposer {
     string,
     {
       clientInfo: Implementation
-      url: URL
+      config: ConnectionConfig
     }
   > = new Map()
 
@@ -30,18 +39,21 @@ export class McpServerComposer {
   }
 
   async add (
-    targetServerUrl: URL,
+    config: ConnectionConfig,
     clientInfo: Implementation,
     skipRegister = false
   ): Promise<void> {
     const targetClient = new Client(clientInfo)
-    const targetTransport = new SSEClientTransport(targetServerUrl)
+    const transport = config.type === 'sse' 
+      ? new SSEClientTransport(config.url)
+      : new StdioClientTransport(config.params)
+
     try {
-      await targetClient.connect(targetTransport)
+      await targetClient.connect(transport)
     } catch (error) {
       formatLog(
         'ERROR',
-        `Connection failed: ${targetServerUrl} -> ${clientInfo.name}\n` +
+        `Connection failed: ${config.type === 'sse' ? config.url : config.params.command} -> ${clientInfo.name}\n` +
           `Reason: ${(error as Error).message}\n` +
           `Will retry in 15 seconds...`
       )
@@ -50,7 +62,7 @@ export class McpServerComposer {
       return new Promise(resolve => {
         setTimeout(() => {
           resolve(
-            this.add(targetServerUrl, clientInfo, skipRegister)
+            this.add(config, clientInfo, skipRegister)
           )
         }, 15000)
       })
@@ -58,12 +70,12 @@ export class McpServerComposer {
 
     formatLog(
       'INFO',
-      `Successfully connected to server: ${targetServerUrl} (${clientInfo.name})`
+      `Successfully connected to server: ${config.type === 'sse' ? config.url : config.params.command} (${clientInfo.name})`
     )
 
-    const name = targetServerUrl.toString()
+    const name = config.type === 'sse' ? config.url.toString() : config.params.command
 
-    this.targetClients.set(name, { clientInfo, url: targetServerUrl })
+    this.targetClients.set(name, { clientInfo, config })
 
     if (skipRegister) {
       formatLog('INFO', `Skipping capability registration: ${name}`)
@@ -100,6 +112,12 @@ export class McpServerComposer {
     return Array.from(this.targetClients.values())
   }
 
+  private createTransport(config: ConnectionConfig) {
+    return config.type === 'sse'
+      ? new SSEClientTransport(config.url)
+      : new StdioClientTransport(config.params)
+  }
+
   private composeTools (tools: Tool[], name: string) {
     for (const tool of tools) {
       const schemaObject = jsonSchemaToZod(tool.inputSchema)
@@ -114,7 +132,7 @@ export class McpServerComposer {
           }
 
           const client = new Client(clientItem.clientInfo)
-          await client.connect(new SSEClientTransport(clientItem.url))
+          await client.connect(this.createTransport(clientItem.config))
           formatLog(
             'DEBUG',
             `Calling tool: ${tool.name}\n` +
@@ -145,7 +163,7 @@ export class McpServerComposer {
           }
 
           const client = new Client(clientItem.clientInfo)
-          await client.connect(new SSEClientTransport(clientItem.url))
+          await client.connect(this.createTransport(clientItem.config))
 
           const result = await client.readResource({
             uri: uri.toString(),
@@ -172,7 +190,7 @@ export class McpServerComposer {
           }
 
           const client = new Client(clientItem.clientInfo)
-          await client.connect(new SSEClientTransport(clientItem.url))
+          await client.connect(this.createTransport(clientItem.config))
 
           const result = await client.getPrompt({
             name: prompt.name,
@@ -187,7 +205,7 @@ export class McpServerComposer {
 
   private handleTargetServerClose (
     name: string,
-    targetServerUrl: URL,
+    config: ConnectionConfig,
     clientInfo: Implementation
   ) {
     return () => {
@@ -197,16 +215,16 @@ export class McpServerComposer {
         'ERROR',
         `Server connection lost:\n` +
           `- Name: ${name}\n` +
-          `- URL: ${targetServerUrl}\n` +
+          `- Type: ${config.type}\n` +
+          `- Config: ${config.type === 'sse' ? config.url : config.params.command}\n` +
           `- Client: ${clientInfo.name}\n` +
           `Will try to reconnect in 10 seconds...`
       )
 
-      return this.add(targetServerUrl, clientInfo, true)
+      return this.add(config, clientInfo, true)
     }
   }
 
-  
   async disconnectAll () {
     for (const client of this.targetClients.keys()) {
       await this.disconnect(client)
@@ -219,5 +237,4 @@ export class McpServerComposer {
       this.targetClients.delete(clientName)
     }
   }
-
 }

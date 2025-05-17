@@ -45,11 +45,11 @@ export class McpRouterServer {
       const transport = new ExpressSSEServerTransport('/sessions')
       this.serverComposer.server.connect(transport)
       transport.onclose = () => {
-        console.log(`Session ${transport.sessionId} closed`)
+        formatLog('INFO',`Session ${transport.sessionId} closed`)
         delete this.transports[transport.sessionId]
       }
       this.transports[transport.sessionId] = transport
-      console.log(`Session ${transport.sessionId} opened`)
+      formatLog('INFO',`Session ${transport.sessionId} opened`)
       transport.handleSSERequest(res)
     })
 
@@ -81,7 +81,7 @@ export class McpRouterServer {
     // Error handling middleware
     this.app.use(
       (err: Error, _, res: express.Response, next: express.NextFunction) => {
-        console.error(err)
+        formatLog('ERROR',err.message)
         res.status(500).send('Internal server error')
         next()
       }
@@ -90,11 +90,27 @@ export class McpRouterServer {
 
   async add (targetServers: McpServerType[]) {
     for (const targetServer of targetServers) {
-      await this.serverComposer.add(new URL(targetServer.url), {
-        name: targetServer.name ?? new URL(targetServer.url).hostname,
-        version: targetServer.version ?? '1.0.0',
-        description: targetServer.description ?? ''
-      })
+      let config;
+      if (targetServer.type === 'sse') {
+        config = {
+          type: 'sse',
+          url: new URL(targetServer.url),
+          params: targetServer.params // 如果有 SSEClientTransportOptions
+        };
+      } else {
+        config = {
+          type: 'stdio',
+          params: targetServer.params
+        };
+      }
+      await this.serverComposer.add(
+        config,
+        {
+          name: targetServer.name ?? new URL(targetServer.url).hostname,
+          version: targetServer.version ?? '1.0.0',
+          description: targetServer.description ?? ''
+        }
+      );
     }
   }
 
@@ -103,7 +119,7 @@ export class McpRouterServer {
     const host = this.serverOptions.host ?? '0.0.0.0'
 
     this.app.listen(port, host, () => {
-      console.log(`Server running on http://${host}:${port}`)
+      formatLog('INFO',`Server running on http://${host}:${port}`)
     })
   }
 }
