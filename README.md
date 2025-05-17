@@ -1,3 +1,5 @@
+![MCP EXE](./assets/image.png)
+
 # MCP Server.exe
 
 把 MCP (Model Context Protocol) 服务器制作成可执行文件，支持现代和传统客户端连接。
