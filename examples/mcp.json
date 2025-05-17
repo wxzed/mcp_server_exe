@@ -1,6 +1,6 @@
 {
     "mcpServers": {
-      "Model Server 1": {
+      "Model Server sse": {
         "url": "http://127.0.0.1:9090"
       },
       "Model Server - stdio": {
