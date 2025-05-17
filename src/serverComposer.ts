@@ -49,7 +49,8 @@ export class McpServerComposer {
   async add (
     config: ConnectionConfig,
     clientInfo: Implementation,
-    skipRegister = false
+    skipRegister = false,
+    retryCount = 0
   ): Promise<void> {
     const targetClient = new Client(clientInfo)
     const transport =
@@ -60,19 +61,31 @@ export class McpServerComposer {
     try {
       await targetClient.connect(transport)
     } catch (error) {
+      if (retryCount >= 2) {
+        formatLog(
+          'ERROR',
+          `Connection failed after 2 retries: ${
+            config.type === 'sse' ? config.url : config.params.command
+          } -> ${clientInfo.name}\n` +
+            `Reason: ${(error as Error).message}\n` +
+            `Skipping connection...`
+        )
+        return
+      }
+
       formatLog(
         'ERROR',
         `Connection failed: ${
           config.type === 'sse' ? config.url : config.params.command
         } -> ${clientInfo.name}\n` +
           `Reason: ${(error as Error).message}\n` +
-          `Will retry in 15 seconds...`
+          `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
       )
 
       // If the connection fails, retry after 15 seconds
       return new Promise(resolve => {
         setTimeout(() => {
-          resolve(this.add(config, clientInfo, skipRegister))
+          resolve(this.add(config, clientInfo, skipRegister, retryCount + 1))
         }, 15000)
       })
     }
@@ -123,7 +136,7 @@ export class McpServerComposer {
       'INFO',
       `All capabilities registration completed for server ${name}`
     )
-    targetClient.close() // We don't have to keep the client open
+    targetClient.close()  
   }
 
   listTargetClients () {
