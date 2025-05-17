@@ -1,27 +1,10 @@
-const express = require('express')
-const {
-  McpServer,
-  ResourceTemplate
-} = require('@modelcontextprotocol/sdk/server/mcp.js')
-const {
-  StreamableHTTPServerTransport
-} = require('@modelcontextprotocol/sdk/server/streamableHttp.js')
-const {
-  SSEServerTransport
-} = require('@modelcontextprotocol/sdk/server/sse.js')
-const {
-  StdioServerTransport
-} = require('@modelcontextprotocol/sdk/server/stdio.js')
+const { ResourceTemplate } = require('@modelcontextprotocol/sdk/server/mcp.js')
+
 const { z } = require('zod')
-const { v4: uuidv4 } = require('uuid')
-const cors = require('cors')
+
 const fs = require('fs')
 const path = require('path')
-const {
-  defaultConfig,
-  loadServerConfig,
-  defaultConfigureMcp
-} = require('./tools/serverConfig.js')
+const { loadServerConfig } = require('./tools/serverConfig.js')
 import { McpRouterServer } from './mcpRouterServer'
 // 解析命令行参数
 const args = process.argv.slice(2)
@@ -30,6 +13,7 @@ let customConfigPath = null
 // 定义 cliArgs 接口
 interface CliArgs {
   serverName?: string
+  host?: string
   port?: string
   version?: string
   description?: string
@@ -148,14 +132,14 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
 }
 
 // 如果没有找到 configureMcp 函数，则使用默认的
-if (!configureMcp) {
-  console.log('使用默认 MCP 配置')
-  configureMcp = require('./tools/mcpConfig.js').configureMcp
-}
-console.log(customConfig, cliArgs)
+// if (!configureMcp) {
+//   console.log('使用默认 MCP 配置')
+//   configureMcp = require('./tools/mcpConfig.js').configureMcp
+// }
+// console.log(customConfig, cliArgs)
 // 合并配置
 const config = loadServerConfig(customConfig, cliArgs)
-console.log(config)
+// console.log(config)
 const serverInfo = {
   name: config.serverName,
   version: config.version,
@@ -167,13 +151,15 @@ const serverInfo = {
 
 // 2. 创建路由服务器实例
 const routerServer = new McpRouterServer(serverInfo, {
-  port: config.port, // 可选，默认为 3001
-  host: '0.0.0.0', // 可选，默认为 "0.0.0.0"
+  port: config.port,
+  host: config.host ?? '0.0.0.0',
   transportType: config.transport as 'sse' | 'stdio'
 })
 
 // 配置MCP服务器的工具、资源和提示
-configureMcp(routerServer.server, ResourceTemplate, z)
+if (typeof configureMcp === 'function') {
+  configureMcp(routerServer.server, ResourceTemplate, z)
+}
 
 async function startServer () {
   try {

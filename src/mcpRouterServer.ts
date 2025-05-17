@@ -172,7 +172,7 @@ export class McpRouterServer {
           params: targetServer.params
         }
       }
-      console.log(targetServer)
+      // console.log(targetServer)
       await this.serverComposer.add(config, {
         name:
           targetServer.name ??
@@ -205,10 +205,10 @@ export class McpRouterServer {
 
       formatLog(
         'INFO',
-        `\nMCP服务器配置: ${JSON.stringify(mcpConfig, null, 2)}`
+        `\n\nMCP Server Config: ${JSON.stringify(mcpConfig, null, 2)}\n\n`
       )
       // formatLog('INFO',`\nMCP服务器(streamable)运行在端口 ${port}/mcp`);
-      formatLog('INFO', `\nMCP服务器(sse)运行在端口 ${port}`)
+      formatLog('INFO', `\n\nMCP Server(sse) running on port ${port}\n\n`)
     })
   }
 }

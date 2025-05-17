@@ -29,6 +29,7 @@ function loadServerConfig(customConfig = {}, cliArgs = {}) {
     // 如果存在命令行参数，它们优先级最高
     if (cliArgs.serverName) config.serverName = cliArgs.serverName;
     if (cliArgs.port) config.port = parseInt(cliArgs.port);
+    if (cliArgs.host) config.host = cliArgs.host;
     if (cliArgs.version) config.version = cliArgs.version;
     if (cliArgs.description) config.description = cliArgs.description;
     if (cliArgs.author) config.author = cliArgs.author;
