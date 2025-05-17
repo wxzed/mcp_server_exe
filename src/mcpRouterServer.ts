@@ -136,7 +136,7 @@ export class McpRouterServer {
   }
 
   parseConfig (config: any) {
-    const mcpServers = config.mcpServers
+    const mcpServers = config?.mcpServers||{}
     const targetServers: McpServerType[] = []
     for (const serverName in mcpServers) {
       const serverConfig = mcpServers[serverName]

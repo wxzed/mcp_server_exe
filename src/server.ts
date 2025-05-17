@@ -163,9 +163,18 @@ if (typeof configureMcp === 'function') {
 
 async function startServer () {
   try {
-    const mcpJSON = fs.readFileSync(config.mcpConfig, 'utf8')
+    let mcpJSON = {}
+    try {
+      if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
+        let text = fs.readFileSync(config.mcpConfig, 'utf8')
+        mcpJSON = JSON.parse(text)
+      }
+    } catch (error) {
+      mcpJSON = {}
+    }
+
     // 加载所有目标服务器
-    await routerServer.importMcpConfig(JSON.parse(mcpJSON))
+    await routerServer.importMcpConfig(mcpJSON)
     // console.log(routerServer.server)
     // 启动服务器
     routerServer.start()
