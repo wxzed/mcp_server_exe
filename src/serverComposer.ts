@@ -107,36 +107,81 @@ export class McpServerComposer {
       return
     }
 
-    formatLog('INFO', `Starting server capability registration: ${name}`)
-    const tools = await targetClient.listTools()
-    this.composeTools(tools.tools, name)
+    const capabilities = await targetClient.getServerCapabilities()
 
     formatLog(
       'INFO',
-      `Tool registration completed [${name}]: ${tools.tools.length} tools in total`
+      `Starting server capability registration: ${name} ${JSON.stringify(
+        capabilities,
+        null,
+        2
+      )}`
     )
 
-    const resources = await targetClient.listResources()
-    this.composeResources(resources.resources, name)
+    if (capabilities?.tools) {
+      try {
+        const tools = await targetClient.listTools()
+        this.composeTools(tools.tools, name)
 
-    formatLog(
-      'INFO',
-      `Resource registration completed [${name}]: ${resources.resources.length} resources in total`
-    )
+        formatLog(
+          'INFO',
+          `Tool registration completed [${name}]: ${tools.tools.length} tools in total`
+        )
+      } catch (error) {
+        formatLog(
+          'ERROR',
+          `Tool registration failed: ${name} ${JSON.stringify(error, null, 2)}`
+        )
+      }
+    }
 
-    const prompts = await targetClient.listPrompts()
-    this.composePrompts(prompts.prompts, name)
+    if (capabilities?.resources) {
+      try {
+        const resources = await targetClient.listResources()
+        this.composeResources(resources.resources, name)
 
-    formatLog(
-      'INFO',
-      `Prompt registration completed [${name}]: ${prompts.prompts.length} prompts in total`
-    )
+        formatLog(
+          'INFO',
+          `Resource registration completed [${name}]: ${resources.resources.length} resources in total`
+        )
+      } catch (error) {
+        formatLog(
+          'ERROR',
+          `Resource registration failed: ${name} ${JSON.stringify(
+            error,
+            null,
+            2
+          )}`
+        )
+      }
+    }
+
+    if (capabilities?.prompts) {
+      try {
+        const prompts = await targetClient.listPrompts()
+        this.composePrompts(prompts.prompts, name)
+
+        formatLog(
+          'INFO',
+          `Prompt registration completed [${name}]: ${prompts.prompts.length} prompts in total`
+        )
+      } catch (error) {
+        formatLog(
+          'ERROR',
+          `Prompt registration failed: ${name} ${JSON.stringify(
+            error,
+            null,
+            2
+          )}`
+        )
+      }
+    }
 
     formatLog(
       'INFO',
       `All capabilities registration completed for server ${name}`
     )
-    targetClient.close()  
+    targetClient.close()
   }
 
   listTargetClients () {
@@ -155,7 +200,7 @@ export class McpServerComposer {
     const existingTools = this.server._registeredTools
     // console.log(existingTools)
     for (const tool of tools) {
-      if ( existingTools[tool.name]) {
+      if (existingTools[tool.name]) {
         continue
       }
       const schemaObject = jsonSchemaToZod(tool.inputSchema)
@@ -189,10 +234,10 @@ export class McpServerComposer {
   }
 
   private composeResources (resources: Resource[], name: string) {
-     // @ts-ignore
-     const existingResources = this.server._registeredResources
+    // @ts-ignore
+    const existingResources = this.server._registeredResources
     //  console.log(existingResources,resources)
-     for (const resource of resources) {
+    for (const resource of resources) {
       if (existingResources[resource.uri]) {
         continue
       }

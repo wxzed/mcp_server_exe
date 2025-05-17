@@ -5,7 +5,7 @@
       },
       "Model Server - stdio": {
         "command":
-          "C:/Users/38957/Documents/GitHub/mcp_server.exe/executables/mcp_server-win-x64.exe",
+          "C:/Users/38957/Documents/mcp_server-win-x64.exe",
         "args": ["--transport", "stdio"]
       }
     }
