@@ -1,0 +1,46 @@
+import { McpRouterServer } from './mcpRouterServer';
+
+// 1. 首先创建服务器信息
+const serverInfo = {
+  name: "MCP Router",
+  version: "1.0.0",
+  description: "Model Context Protocol Router Server",
+  supportedProtocolVersions: ["1.0.0"]
+};
+
+// 2. 创建路由服务器实例
+const routerServer = new McpRouterServer(serverInfo, {
+  port: 3001,          // 可选，默认为 3001
+  host: "0.0.0.0"      // 可选，默认为 "0.0.0.0"
+});
+
+// 3. 配置目标服务器
+const targetServers = [
+  {
+    url: "http://localhost:9090",
+    name: "Model Server 1",
+    version: "1.0.0",
+    description: "第一个模型服务器"
+  },
+  {
+    url: "http://localhost:3000/sse",
+    name: "Model Server 2",
+    version: "1.0.0",
+    description: "第二个模型服务器"
+  }
+];
+
+// 4. 加载目标服务器并启动路由服务器
+async function startServer() {
+  try {
+    // 加载所有目标服务器
+    await routerServer.add(targetServers);
+    
+    // 启动服务器
+    routerServer.start();
+  } catch (error) {
+    console.error("启动服务器时发生错误:", error);
+  }
+}
+
+startServer();
