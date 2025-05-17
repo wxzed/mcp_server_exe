@@ -1,5 +1,4 @@
 import { McpRouterServer } from './mcpRouterServer'
-import type { McpServerType } from './utils/schemas'
 // 1. 首先创建服务器信息
 const serverInfo = {
   name: 'MCP Router',

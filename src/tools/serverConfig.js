@@ -34,7 +34,8 @@ function loadServerConfig(customConfig = {}, cliArgs = {}) {
     if (cliArgs.author) config.author = cliArgs.author;
     if (cliArgs.license) config.license = cliArgs.license;
     if (cliArgs.homepage) config.homepage = cliArgs.homepage;
-
+    if (cliArgs.transport) config.transport = cliArgs.transport;
+    if (cliArgs.mcpConfig) config.mcpConfig = cliArgs.mcpConfig;
     return config;
 }
 

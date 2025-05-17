@@ -1,30 +1,49 @@
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js'
 import { McpServerComposer } from './serverComposer'
 import { ExpressSSEServerTransport } from './expressSseTransport'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type { McpServerType } from './utils/schemas'
 import express from 'express'
 import cors from 'cors'
 import type { Express } from 'express'
 import { formatLog } from './utils/console'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 
 export class McpRouterServer {
   private readonly serverComposer: McpServerComposer
-  private readonly transports: Record<string, ExpressSSEServerTransport> = {}
-  private readonly app: Express
-
+  private readonly transports: Record<
+    string,
+    ExpressSSEServerTransport | StdioServerTransport
+  > = {}
+  private app: Express
+  private readonly transportType: 'sse' | 'stdio'
+  public readonly server: McpServer
   constructor (
     serverInfo: Implementation,
     private readonly serverOptions: {
       port?: number
       host?: string
+      transportType?: 'sse' | 'stdio'
     }
   ) {
     this.serverComposer = new McpServerComposer(serverInfo)
-    this.app = express()
+    this.server = this.serverComposer.server
+    this.transportType = serverOptions.transportType ?? 'sse'
     this.setupRoutes()
   }
 
   private setupRoutes () {
+    if (this.transportType === 'stdio') {
+      // stdio 模式
+      const transport = new StdioServerTransport()
+      this.serverComposer.server.connect(transport)
+      this.transports['stdio'] = transport
+      formatLog('INFO', 'Server initialized in stdio mode')
+      return
+    }
+
+    this.app = express()
+    // SSE 模式
     // Configure CORS
     const corsOptions = {
       origin: '*', // Allow all origins, consider setting specific domains in production
@@ -39,6 +58,34 @@ export class McpRouterServer {
 
     // Support JSON request body parsing
     this.app.use(express.json())
+
+    const transports = {
+      streamable: new Map(),
+      sse: new Map()
+    }
+
+    // 现代化Streamable HTTP端点
+    // app.all('/mcp', async (req, res) => {
+    //   const transport = new StreamableHTTPServerTransport({
+    //     sessionIdGenerator: () => uuidv4(),
+    //     onsessioninitialized: (sessionId) => {
+    //       console.log(`新会话已初始化: ${sessionId}`);
+    //     }
+    //   });
+
+    //   if (transport.sessionId) {
+    //     transports.streamable.set(transport.sessionId, transport);
+
+    //     res.on("close", () => {
+    //       if (transport.sessionId) {
+    //         transports.streamable.delete(transport.sessionId);
+    //       }
+    //     });
+
+    //     await transport.handleRequest(req, res, req.body);
+    //     await server.connect(transport);
+    //   }
+    // });
 
     // SSE connection endpoint
     this.app.get('/', (_, res) => {
@@ -60,16 +107,16 @@ export class McpRouterServer {
         res.status(400).send('Invalid session ID')
         return
       }
-      this.transports[sessionId].handlePostMessage(req, res)
-    })
-
-    // Health check endpoint
-    this.app.get('/health', (_, res) => {
-      res.status(200).send('OK')
+      const transport = this.transports[sessionId]
+      if (transport instanceof ExpressSSEServerTransport) {
+        transport.handlePostMessage(req, res)
+      } else {
+        res.status(400).send('Invalid transport type')
+      }
     })
 
     // API endpoint
-    this.app.get('/api/list-targets', (_, res) => {
+    this.app.get('/api/list-mcp-servers', (_, res) => {
       res.json(this.serverComposer.listTargetClients())
     })
 
@@ -89,8 +136,8 @@ export class McpRouterServer {
   }
 
   parseConfig (config: any) {
-    const mcpServers = config.mcpServers;
-    const targetServers: McpServerType[] = [];
+    const mcpServers = config.mcpServers
+    const targetServers: McpServerType[] = []
     for (const serverName in mcpServers) {
       const serverConfig = mcpServers[serverName]
       const targetServer: McpServerType = {
@@ -109,7 +156,6 @@ export class McpRouterServer {
   }
 
   async importMcpConfig (config: any) {
-
     const targetServers = this.parseConfig(config)
 
     for (const targetServer of targetServers) {
@@ -118,7 +164,7 @@ export class McpRouterServer {
         config = {
           type: 'sse',
           url: new URL(targetServer.url),
-          params: targetServer.params // 如果有 SSEClientTransportOptions
+          params: targetServer.params
         }
       } else {
         config = {
@@ -126,8 +172,13 @@ export class McpRouterServer {
           params: targetServer.params
         }
       }
+      console.log(targetServer)
       await this.serverComposer.add(config, {
-        name: targetServer.name ?? new URL(targetServer.url).hostname,
+        name:
+          targetServer.name ??
+          (targetServer.url
+            ? new URL(targetServer.url).hostname
+            : 'stdio-server'),
         version: targetServer.version ?? '1.0.0',
         description: targetServer.description ?? ''
       })
@@ -135,11 +186,29 @@ export class McpRouterServer {
   }
 
   start () {
-    const port = this.serverOptions.port ?? 3001
+    if (this.transportType === 'stdio') {
+      formatLog('INFO', 'Server running in stdio mode')
+      return
+    }
+
+    const port = this.serverOptions.port ?? 3003
     const host = this.serverOptions.host ?? '0.0.0.0'
 
     this.app.listen(port, host, () => {
-      formatLog('INFO', `Server running on http://${host}:${port}`)
+      let mcpConfig = { mcpServers: {} }
+      // @ts-ignore
+      const serverInfo = this.serverComposer.server.server._serverInfo
+
+      mcpConfig['mcpServers'][serverInfo.name] = {
+        url: `http://127.0.0.1:${port}/sse`
+      }
+
+      formatLog(
+        'INFO',
+        `\nMCP服务器配置: ${JSON.stringify(mcpConfig, null, 2)}`
+      )
+      // formatLog('INFO',`\nMCP服务器(streamable)运行在端口 ${port}/mcp`);
+      formatLog('INFO', `\nMCP服务器(sse)运行在端口 ${port}`)
     })
   }
 }

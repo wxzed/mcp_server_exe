@@ -10,19 +10,27 @@ import type {
   Resource,
   Prompt
 } from '@modelcontextprotocol/sdk/types.js'
-import { SSEClientTransport,type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js'
-import { StdioClientTransport, type StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js'
+import {
+  SSEClientTransport,
+  type SSEClientTransportOptions
+} from '@modelcontextprotocol/sdk/client/sse.js'
+import {
+  StdioClientTransport,
+  type StdioServerParameters
+} from '@modelcontextprotocol/sdk/client/stdio.js'
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
 
-type ConnectionConfig = {
-  type: 'sse'
-  url: URL,
-  params: SSEClientTransportOptions
-} | {
-  type: 'stdio'
-  params: StdioServerParameters
-}
+type ConnectionConfig =
+  | {
+      type: 'sse'
+      url: URL
+      params: SSEClientTransportOptions
+    }
+  | {
+      type: 'stdio'
+      params: StdioServerParameters
+    }
 
 export class McpServerComposer {
   public readonly server: McpServer
@@ -44,16 +52,19 @@ export class McpServerComposer {
     skipRegister = false
   ): Promise<void> {
     const targetClient = new Client(clientInfo)
-    const transport = config.type === 'sse' 
-      ? new SSEClientTransport(config.url)
-      : new StdioClientTransport(config.params)
+    const transport =
+      config.type === 'sse'
+        ? new SSEClientTransport(config.url)
+        : new StdioClientTransport(config.params)
 
     try {
       await targetClient.connect(transport)
     } catch (error) {
       formatLog(
         'ERROR',
-        `Connection failed: ${config.type === 'sse' ? config.url : config.params.command} -> ${clientInfo.name}\n` +
+        `Connection failed: ${
+          config.type === 'sse' ? config.url : config.params.command
+        } -> ${clientInfo.name}\n` +
           `Reason: ${(error as Error).message}\n` +
           `Will retry in 15 seconds...`
       )
@@ -61,19 +72,20 @@ export class McpServerComposer {
       // If the connection fails, retry after 15 seconds
       return new Promise(resolve => {
         setTimeout(() => {
-          resolve(
-            this.add(config, clientInfo, skipRegister)
-          )
+          resolve(this.add(config, clientInfo, skipRegister))
         }, 15000)
       })
     }
 
     formatLog(
       'INFO',
-      `Successfully connected to server: ${config.type === 'sse' ? config.url : config.params.command} (${clientInfo.name})`
+      `Successfully connected to server: ${
+        config.type === 'sse' ? config.url : config.params.command
+      } (${clientInfo.name})`
     )
 
-    const name = config.type === 'sse' ? config.url.toString() : config.params.command
+    const name =
+      config.type === 'sse' ? config.url.toString() : config.params.command
 
     this.targetClients.set(name, { clientInfo, config })
 
@@ -86,7 +98,10 @@ export class McpServerComposer {
     const tools = await targetClient.listTools()
     this.composeTools(tools.tools, name)
 
-    formatLog('INFO', `Tool registration completed [${name}]: ${tools.tools.length} tools in total`)
+    formatLog(
+      'INFO',
+      `Tool registration completed [${name}]: ${tools.tools.length} tools in total`
+    )
 
     const resources = await targetClient.listResources()
     this.composeResources(resources.resources, name)
@@ -104,7 +119,10 @@ export class McpServerComposer {
       `Prompt registration completed [${name}]: ${prompts.prompts.length} prompts in total`
     )
 
-    formatLog('INFO', `All capabilities registration completed for server ${name}`)
+    formatLog(
+      'INFO',
+      `All capabilities registration completed for server ${name}`
+    )
     targetClient.close() // We don't have to keep the client open
   }
 
@@ -112,14 +130,21 @@ export class McpServerComposer {
     return Array.from(this.targetClients.values())
   }
 
-  private createTransport(config: ConnectionConfig) {
+  private createTransport (config: ConnectionConfig) {
     return config.type === 'sse'
       ? new SSEClientTransport(config.url)
       : new StdioClientTransport(config.params)
   }
 
   private composeTools (tools: Tool[], name: string) {
+    // 获取this.server的所有已有的tool，如果tool.name与tools中的tool.
+    // @ts-ignore
+    const existingTools = this.server._registeredTools
+    // console.log(existingTools)
     for (const tool of tools) {
+      if ( existingTools[tool.name]) {
+        continue
+      }
       const schemaObject = jsonSchemaToZod(tool.inputSchema)
       this.server.tool(
         tool.name,
@@ -151,7 +176,13 @@ export class McpServerComposer {
   }
 
   private composeResources (resources: Resource[], name: string) {
-    for (const resource of resources) {
+     // @ts-ignore
+     const existingResources = this.server._registeredResources
+    //  console.log(existingResources,resources)
+     for (const resource of resources) {
+      if (existingResources[resource.uri]) {
+        continue
+      }
       this.server.resource(
         resource.name,
         resource.uri,
@@ -177,7 +208,12 @@ export class McpServerComposer {
   }
 
   private composePrompts (prompts: Prompt[], name: string) {
+    // @ts-ignore
+    const existingPrompts = this.server._registeredPrompts
     for (const prompt of prompts) {
+      if (existingPrompts[prompt.name]) {
+        continue
+      }
       const argsSchema = jsonSchemaToZod(prompt.arguments)
       this.server.prompt(
         prompt.name,
@@ -216,7 +252,9 @@ export class McpServerComposer {
         `Server connection lost:\n` +
           `- Name: ${name}\n` +
           `- Type: ${config.type}\n` +
-          `- Config: ${config.type === 'sse' ? config.url : config.params.command}\n` +
+          `- Config: ${
+            config.type === 'sse' ? config.url : config.params.command
+          }\n` +
           `- Client: ${clientInfo.name}\n` +
           `Will try to reconnect in 10 seconds...`
       )
