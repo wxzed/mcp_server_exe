@@ -87,8 +87,31 @@ if (!cliArgs.transport) {
   cliArgs.transport = 'sse'
 }
 
+// 合并配置
+const config = loadServerConfig({}, cliArgs)
+
+let mcpJSON:any = {}
+try {
+  if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
+    let text = fs.readFileSync(config.mcpConfig, 'utf8')
+    mcpJSON = JSON.parse(text)
+  }
+} catch (error) {
+  mcpJSON = {}
+}
+
+// console.log(config)
+const serverInfo =mcpJSON.serverInfo|| {
+  name: config.serverName,
+  version: config.version,
+  description: config.description,
+  author: config.author,
+  license: config.license,
+  homepage: config.homepage
+}
+
+
 // 加载配置文件
-let customConfig = {}
 let configureMcp = null
 
 if (customConfigPath && fs.existsSync(customConfigPath)) {
@@ -97,26 +120,7 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
 
   try {
     const customModule = require(customConfigFullPath)
-
-    // 加载服务器配置
-    if (typeof customModule === 'object') {
-      // 如果导出的是一个对象，直接作为服务器配置
-      customConfig = customModule
-    }
-
-    // 检查并加载 configureServer 函数
-    if (
-      customModule.configureServer &&
-      typeof customModule.configureServer === 'function'
-    ) {
-      // 如果存在 configureServer 函数，则调用它获取服务器配置
-      console.log('发现 configureServer 函数，使用其返回值作为服务器配置')
-      const serverConfig = customModule.configureServer()
-      if (serverConfig && typeof serverConfig === 'object') {
-        customConfig = serverConfig
-      }
-    }
-
+ 
     // 检查并加载 configureMcp 函数
     if (
       customModule.configureMcp &&
@@ -131,23 +135,6 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
   }
 }
 
-// 如果没有找到 configureMcp 函数，则使用默认的
-// if (!configureMcp) {
-//   console.log('使用默认 MCP 配置')
-//   configureMcp = require('./tools/mcpConfig.js').configureMcp
-// }
-// console.log(customConfig, cliArgs)
-// 合并配置
-const config = loadServerConfig(customConfig, cliArgs)
-// console.log(config)
-const serverInfo = {
-  name: config.serverName,
-  version: config.version,
-  description: config.description,
-  author: config.author,
-  license: config.license,
-  homepage: config.homepage
-}
 
 // 2. 创建路由服务器实例
 const routerServer = new McpRouterServer(serverInfo, {
@@ -163,16 +150,6 @@ if (typeof configureMcp === 'function') {
 
 async function startServer () {
   try {
-    let mcpJSON = {}
-    try {
-      if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
-        let text = fs.readFileSync(config.mcpConfig, 'utf8')
-        mcpJSON = JSON.parse(text)
-      }
-    } catch (error) {
-      mcpJSON = {}
-    }
-
     // 加载所有目标服务器
     await routerServer.importMcpConfig(mcpJSON)
     // console.log(routerServer.server)

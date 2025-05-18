@@ -136,7 +136,10 @@ export class McpRouterServer {
   }
 
   parseConfig (config: any) {
-    const mcpServers = config?.mcpServers||{}
+    const mcpServers = config?.mcpServers||{};
+    //链式调用
+    const toolChains = config?.toolChains||[];
+    const tools = config?.tools||[];
     const targetServers: McpServerType[] = []
     for (const serverName in mcpServers) {
       const serverConfig = mcpServers[serverName]
@@ -148,11 +151,19 @@ export class McpRouterServer {
           ? {}
           : {
               ...serverConfig
-            }
+            },
+        tools
       }
       targetServers.push(targetServer)
     }
     return targetServers
+  }
+
+  parseToolChains (config: any) {
+    const toolChains = config?.toolChains||[];
+    for (const toolChain of toolChains) {
+      this.serverComposer.composeToolChain(toolChain)
+    }
   }
 
   async importMcpConfig (config: any) {
@@ -164,12 +175,14 @@ export class McpRouterServer {
         config = {
           type: 'sse',
           url: new URL(targetServer.url),
-          params: targetServer.params
+          params: targetServer.params,
+          tools: targetServer.tools
         }
       } else {
         config = {
           type: 'stdio',
-          params: targetServer.params
+          params: targetServer.params,
+          tools: targetServer.tools
         }
       }
       // console.log(targetServer)
@@ -183,8 +196,10 @@ export class McpRouterServer {
         description: targetServer.description ?? ''
       })
     }
-  }
 
+    this.parseToolChains(config)
+    
+  }
   start () {
     if (this.transportType === 'stdio') {
       formatLog('INFO', 'Server running in stdio mode')

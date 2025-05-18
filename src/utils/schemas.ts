@@ -8,7 +8,8 @@ export const mcpServerSchema = z.object({
   version: z.string().optional(),
   description: z.string().optional(),
   type: z.enum(['sse', 'stdio']),
-  params: z.custom<StdioServerParameters | SSEClientTransportOptions>().optional()
+  params: z.custom<StdioServerParameters | SSEClientTransportOptions>().optional(),
+  tools: z.array(z.string()).optional()
 })
 
 export type McpServerType = z.infer<typeof mcpServerSchema>

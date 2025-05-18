@@ -23,14 +23,37 @@ import { formatLog } from './utils/console'
 
 type ConnectionConfig =
   | {
-      type: 'sse'
-      url: URL
-      params: SSEClientTransportOptions
-    }
+    type: 'sse'
+    url: URL
+    params: SSEClientTransportOptions
+    tools: string[]
+  }
   | {
-      type: 'stdio'
-      params: StdioServerParameters
-    }
+    type: 'stdio'
+    params: StdioServerParameters
+    tools: string[]
+  }
+
+interface ToolChainStep {
+  toolName: string;
+  args: any;
+  outputMapping?: {
+    [key: string]: string; // 将当前步骤的输出映射到下一个步骤的输入
+  };
+  fromStep?: number;
+}
+
+interface ToolChainOutput {
+  steps?: number[];  // 指定要输出的步骤索引，如果为空则输出所有步骤
+  final?: boolean;   // 是否只输出最后一步
+}
+
+interface ToolChain {
+  name: string;
+  steps: ToolChainStep[];
+  description?: string;
+  output?: ToolChainOutput;  // 添加输出配置
+}
 
 export class McpServerComposer {
   public readonly server: McpServer
@@ -42,11 +65,11 @@ export class McpServerComposer {
     }
   > = new Map()
 
-  constructor (serverInfo: Implementation) {
+  constructor(serverInfo: Implementation) {
     this.server = new McpServer(serverInfo)
   }
 
-  async add (
+  async add(
     config: ConnectionConfig,
     clientInfo: Implementation,
     skipRegister = false,
@@ -58,28 +81,28 @@ export class McpServerComposer {
         ? new SSEClientTransport(config.url)
         : new StdioClientTransport(config.params)
 
+    const targetTools = config.tools;
+
     try {
       await targetClient.connect(transport)
     } catch (error) {
       if (retryCount >= 2) {
         formatLog(
           'ERROR',
-          `Connection failed after 2 retries: ${
-            config.type === 'sse' ? config.url : config.params.command
+          `Connection failed after 2 retries: ${config.type === 'sse' ? config.url : config.params.command
           } -> ${clientInfo.name}\n` +
-            `Reason: ${(error as Error).message}\n` +
-            `Skipping connection...`
+          `Reason: ${(error as Error).message}\n` +
+          `Skipping connection...`
         )
         return
       }
 
       formatLog(
         'ERROR',
-        `Connection failed: ${
-          config.type === 'sse' ? config.url : config.params.command
+        `Connection failed: ${config.type === 'sse' ? config.url : config.params.command
         } -> ${clientInfo.name}\n` +
-          `Reason: ${(error as Error).message}\n` +
-          `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
+        `Reason: ${(error as Error).message}\n` +
+        `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
       )
 
       // If the connection fails, retry after 15 seconds
@@ -92,8 +115,7 @@ export class McpServerComposer {
 
     formatLog(
       'INFO',
-      `Successfully connected to server: ${
-        config.type === 'sse' ? config.url : config.params.command
+      `Successfully connected to server: ${config.type === 'sse' ? config.url : config.params.command
       } (${clientInfo.name})`
     )
 
@@ -121,6 +143,11 @@ export class McpServerComposer {
     if (capabilities?.tools) {
       try {
         const tools = await targetClient.listTools()
+
+        if (targetTools && targetTools.length > 0) {
+          tools.tools = tools.tools.filter(tool => targetTools.includes(tool.name))
+        }
+
         this.composeTools(tools.tools, name)
 
         formatLog(
@@ -184,17 +211,83 @@ export class McpServerComposer {
     targetClient.close()
   }
 
-  listTargetClients () {
+  composeToolChain(toolChain: ToolChain) {
+    this.server.tool(
+      `chain_${toolChain.name}`,
+      toolChain.description ?? 'Execute a chain of tools',
+      {},
+      async () => {
+        const results: any[] = [];
+
+        for (let i = 0; i < toolChain.steps.length; i++) {
+          const step = toolChain.steps[i];
+          // @ts-ignore
+          const registeredTool = this.server._registeredTools[step.toolName];
+          if (!registeredTool) {
+            throw new Error(`Tool not found: ${step.toolName}`);
+          }
+
+          formatLog(
+            'DEBUG',
+            `Executing chain step ${i}: ${step.toolName}\n`
+          );
+
+          if (step.outputMapping) {
+            const sourceResult = step.fromStep !== undefined 
+              ? results[step.fromStep] 
+              : results[results.length - 1];
+
+            if (sourceResult) {
+              for (const [key, path] of Object.entries(step.outputMapping)) {
+                step.args[key] = this.getNestedValue(sourceResult, path);
+              }
+            }
+          }
+
+          const result = await registeredTool.callback(step.args);
+          results.push(result);
+        }
+
+        // 处理输出结果
+        let outputResults: any[];
+        if (toolChain.output?.final) {
+          // 只输出最后一步
+          outputResults = [results[results.length - 1]];
+        } else if (toolChain.output?.steps && toolChain.output.steps.length > 0) {
+          // 输出指定步骤
+          outputResults = toolChain.output.steps
+            .filter(stepIndex => stepIndex >= 0 && stepIndex < results.length)
+            .map(stepIndex => results[stepIndex]);
+        } else {
+          // 默认输出所有步骤
+          outputResults = results;
+        }
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(outputResults)
+          }]
+        };
+      }
+    );
+  }
+
+  private getNestedValue(obj: any, path: string): any {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+  }
+
+  listTargetClients() {
     return Array.from(this.targetClients.values())
   }
 
-  private createTransport (config: ConnectionConfig) {
+  private createTransport(config: ConnectionConfig) {
     return config.type === 'sse'
       ? new SSEClientTransport(config.url)
       : new StdioClientTransport(config.params)
   }
 
-  private composeTools (tools: Tool[], name: string) {
+  private composeTools(tools: Tool[], name: string) {
     // 获取this.server的所有已有的tool，如果tool.name与tools中的tool.
     // @ts-ignore
     const existingTools = this.server._registeredTools
@@ -219,7 +312,7 @@ export class McpServerComposer {
           formatLog(
             'DEBUG',
             `Calling tool: ${tool.name}\n` +
-              `Arguments: ${JSON.stringify(args, null, 2)}`
+            `Arguments: ${JSON.stringify(args, null, 2)}`
           )
 
           const result = await client.callTool({
@@ -233,7 +326,7 @@ export class McpServerComposer {
     }
   }
 
-  private composeResources (resources: Resource[], name: string) {
+  private composeResources(resources: Resource[], name: string) {
     // @ts-ignore
     const existingResources = this.server._registeredResources
     //  console.log(existingResources,resources)
@@ -265,7 +358,7 @@ export class McpServerComposer {
     }
   }
 
-  private composePrompts (prompts: Prompt[], name: string) {
+  private composePrompts(prompts: Prompt[], name: string) {
     // @ts-ignore
     const existingPrompts = this.server._registeredPrompts
     for (const prompt of prompts) {
@@ -297,7 +390,7 @@ export class McpServerComposer {
     }
   }
 
-  private handleTargetServerClose (
+  private handleTargetServerClose(
     name: string,
     config: ConnectionConfig,
     clientInfo: Implementation
@@ -308,26 +401,25 @@ export class McpServerComposer {
       formatLog(
         'ERROR',
         `Server connection lost:\n` +
-          `- Name: ${name}\n` +
-          `- Type: ${config.type}\n` +
-          `- Config: ${
-            config.type === 'sse' ? config.url : config.params.command
-          }\n` +
-          `- Client: ${clientInfo.name}\n` +
-          `Will try to reconnect in 10 seconds...`
+        `- Name: ${name}\n` +
+        `- Type: ${config.type}\n` +
+        `- Config: ${config.type === 'sse' ? config.url : config.params.command
+        }\n` +
+        `- Client: ${clientInfo.name}\n` +
+        `Will try to reconnect in 10 seconds...`
       )
 
       return this.add(config, clientInfo, true)
     }
   }
 
-  async disconnectAll () {
+  async disconnectAll() {
     for (const client of this.targetClients.keys()) {
       await this.disconnect(client)
     }
   }
 
-  async disconnect (clientName: string) {
+  async disconnect(clientName: string) {
     const client = this.targetClients.get(clientName)
     if (client) {
       this.targetClients.delete(clientName)

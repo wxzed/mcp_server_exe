@@ -129,17 +129,6 @@ The server supports using a configuration file to configure both server paramete
 
 ```javascript
 module.exports = {
-  // 服务器基本配置 | Server basic configuration
-  serverName: "custom-mcp-server",
-  port: 8080,
-  
-  // 动态服务器配置函数 | Dynamic server configuration function
-  configureServer: function() {
-    return {
-      serverName: "dynamic-server",
-      // 其他配置 | Other configurations
-    };
-  },
   
   // MCP 配置函数 | MCP configuration function
   configureMcp: function(server, ResourceTemplate, z) {

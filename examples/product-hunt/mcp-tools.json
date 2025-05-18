@@ -1,0 +1,68 @@
+{
+    "mcpServers": {
+        "Model Server stdio": {
+            "command": "/Users/shadow/Documents/GitHub/mcp-use-browser/dist/mcp-use-browser",
+            "args": [
+                "--transport",
+                "stdio"
+            ]
+        }
+    },
+    "serverInfo": {
+        "name": "Product-hunt-mcp-server",
+        "version": "1.0.0",
+        "description": "Product-hunt-mcp-server",
+        "author": "shadow"
+    },
+    "tools": [
+        "browser_execute_javascript",
+        "browser_navigate",
+        "browser_close"
+    ],
+    "toolChains": [{
+        "steps": [{
+                "toolName": "get_product_hunt_url",
+                "args": {
+                    "input": "initial value"
+                }
+            },
+            {
+                "toolName": "load_product_hunt_js_code",
+                "args": {
+                    "input": ""
+                }
+            },
+            {
+                "toolName": "browser_navigate",
+                "args": {
+                    "url": ""
+                },
+                "outputMapping": {
+                    "url": "content.0.text"
+                },
+                "fromStep": 0
+            },
+            {
+                "toolName": "browser_execute_javascript",
+                "args": {
+                    "code": ""
+                },
+                "outputMapping": {
+                    "code": "content.0.text"
+                },
+                "fromStep": 1
+            },
+            {
+                "toolName": "browser_close",
+                "args": {
+                    "input": ""
+                }
+            }
+        ],
+        "output": {
+            "steps": [3]
+        },
+        "name": "product-hunt-tool-chain",
+        "description": "A chain of tools that process data sequentially"
+    }]
+}
