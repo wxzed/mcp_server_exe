@@ -18,7 +18,7 @@ export class McpRouterServer {
   private app: Express
   private readonly transportType: 'sse' | 'stdio'
   public readonly server: McpServer
-  constructor(
+  constructor (
     serverInfo: Implementation,
     private readonly serverOptions: {
       port?: number
@@ -32,7 +32,7 @@ export class McpRouterServer {
     this.setupRoutes()
   }
 
-  private setupRoutes() {
+  private setupRoutes () {
     if (this.transportType === 'stdio') {
       // stdio 模式
       const transport = new StdioServerTransport()
@@ -135,9 +135,9 @@ export class McpRouterServer {
     )
   }
 
-  parseConfig(config: any) {
-    const mcpServers = config?.mcpServers || {};
-  
+  parseConfig (config: any) {
+    const mcpServers = config?.mcpServers || {}
+
     const targetServers: McpServerType[] = []
     for (const serverName in mcpServers) {
       const serverConfig = mcpServers[serverName]
@@ -148,22 +148,22 @@ export class McpRouterServer {
         params: serverConfig.url
           ? {}
           : {
-            ...serverConfig
-          } 
+              ...serverConfig
+            }
       }
       targetServers.push(targetServer)
     }
     return targetServers
   }
 
-  parseToolChains(config: any) {
-    const toolChains = config?.toolChains || [];
+  parseToolChains (config: any) {
+    const toolChains = config?.toolChains || []
     for (const toolChain of toolChains) {
       this.serverComposer.composeToolChain(toolChain)
     }
   }
 
-  async importMcpConfig(config: any) {
+  async importMcpConfig (config: any) {
     const targetServers = this.parseConfig(config)
 
     for (const targetServer of targetServers) {
@@ -199,7 +199,7 @@ export class McpRouterServer {
     this.parseToolChains(config)
 
     // tools的开关
-    const tools = config?.tools || [];
+    const tools = config?.tools || []
 
     if (tools.length > 0) {
       //@ts-ignore
@@ -209,11 +209,14 @@ export class McpRouterServer {
           this.serverComposer.server._registeredTools[name].disable()
         }
       }
+      // config.toolChains
+      for (const toolChain of config.toolChains) {
+        //@ts-ignore
+        this.serverComposer.server._registeredTools[toolChain.name].enable()
+      }
     }
-
-
   }
-  start() {
+  start () {
     if (this.transportType === 'stdio') {
       formatLog('INFO', 'Server running in stdio mode')
       return
