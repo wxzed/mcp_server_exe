@@ -15,9 +15,7 @@
         "author": "shadow"
     },
     "tools": [
-        "browser_execute_javascript",
-        "browser_navigate",
-        "browser_close"
+        "product_hunt_news"
     ],
     "toolChains": [{
         "steps": [{

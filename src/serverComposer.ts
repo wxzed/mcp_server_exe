@@ -64,6 +64,7 @@ export class McpServerComposer {
       config: ConnectionConfig
     }
   > = new Map()
+  private readonly clientTools: Map<string, Set<string>> = new Map()
 
   constructor(serverInfo: Implementation) {
     this.server = new McpServer(serverInfo)
@@ -80,8 +81,6 @@ export class McpServerComposer {
       config.type === 'sse'
         ? new SSEClientTransport(config.url)
         : new StdioClientTransport(config.params)
-
-    const targetTools = config.tools;
 
     try {
       await targetClient.connect(transport)
@@ -143,10 +142,6 @@ export class McpServerComposer {
     if (capabilities?.tools) {
       try {
         const tools = await targetClient.listTools()
-
-        if (targetTools && targetTools.length > 0) {
-          tools.tools = tools.tools.filter(tool => targetTools.includes(tool.name))
-        }
 
         this.composeTools(tools.tools, name)
 
@@ -213,7 +208,7 @@ export class McpServerComposer {
 
   composeToolChain(toolChain: ToolChain) {
     this.server.tool(
-      `chain_${toolChain.name}`,
+      toolChain.name,
       toolChain.description ?? 'Execute a chain of tools',
       {},
       async () => {
@@ -235,71 +230,114 @@ export class McpServerComposer {
             );
 
             if (step.outputMapping) {
-              const sourceResult = step.fromStep !== undefined 
-                ? results[step.fromStep] 
+              const sourceResult = step.fromStep !== undefined
+                ? results[step.fromStep]
                 : results[results.length - 1];
 
               if (sourceResult) {
                 for (const [key, path] of Object.entries(step.outputMapping)) {
-                  step.args[key] = this.getNestedValue(sourceResult, path);
+                  try {
+                    const value = this.getNestedValue(sourceResult, path);
+                    if (value !== undefined) {
+                      step.args[key] = value;
+                    } else {
+                      formatLog(
+                        'INFO',
+                        `Output mapping path "${path}" returned undefined for step ${i}`
+                      );
+                    }
+                  } catch (error) {
+                    formatLog(
+                      'ERROR',
+                      `Failed to map output for step ${i}: ${error.message}`
+                    );
+                  }
                 }
               }
             }
 
             let result;
-            // 检查是否是需要客户端的工具
-            if (registeredTool.needsClient) {
-              // 遍历所有客户端，找到包含该工具的客户端
-              let foundClientName: string | undefined;
+            try {
+              if (registeredTool.needsClient) {
+                let foundClientName: string | undefined;
 
-              for (const [clientName, clientInfo] of this.targetClients.entries()) {
-                if (!clientInfo.config.tools || clientInfo.config.tools.includes(step.toolName)) {
-                  foundClientName = clientName;
-                  break;
+                for (const [clientName, _] of this.targetClients.entries()) {
+                  // 使用 clientTools 来判断客户端是否真的支持这个工具
+                  const supportedTools = this.clientTools.get(clientName)
+                  if (supportedTools?.has(step.toolName)) {
+                    foundClientName = clientName;
+                    break;
+                  }
                 }
-              }
 
-              if (!foundClientName) {
-                throw new Error(`No client found for tool: ${step.toolName}`);
-              }
-
-              // 复用或创建客户端连接
-              let client = clientsMap.get(foundClientName);
-              if (!client) {
-                const clientItem = this.targetClients.get(foundClientName);
-                if (!clientItem) {
-                  throw new Error(`Client configuration not found for: ${foundClientName}`);
+                if (!foundClientName) {
+                  throw new Error(`No client found for tool: ${step.toolName}`);
                 }
-                client = new Client(clientItem.clientInfo);
-                await client.connect(this.createTransport(clientItem.config));
-                clientsMap.set(foundClientName, client);
+
+                // 复用或创建客户端连接
+                let client = clientsMap.get(foundClientName);
+                if (!client) {
+                  const clientItem = this.targetClients.get(foundClientName);
+                  if (!clientItem) {
+                    throw new Error(`Client configuration not found for: ${foundClientName}`);
+                  }
+                  client = new Client(clientItem.clientInfo);
+                  await client.connect(this.createTransport(clientItem.config));
+                  clientsMap.set(foundClientName, client);
+                } else {
+                  // console.log('复用',foundClientName)
+                }
+
+                result = await registeredTool.chainExecutor(step.args, client);
+              } else {
+                // 本地工具直接调用
+                result = await registeredTool.callback(step.args);
               }
 
-              result = await registeredTool.chainExecutor(step.args, client);
-            } else {
-              // 本地工具直接调用
-              result = await registeredTool.callback(step.args);
+              // 确保结果不是undefined
+              results.push(result || { content: [{ type: "text", text: "" }] });
+            } catch (error) {
+              formatLog(
+                'ERROR',
+                `Step ${i} (${step.toolName}) execution failed: ${error.message}`
+              );
+              // 在错误时添加一个空结果
+              results.push({ content: [{ type: "text", text: `Error: ${error.message}` }] });
             }
 
-            results.push(result);
           }
 
-          // 处理输出结果
-          let outputResults: any[];
-          if (toolChain.output?.final) {
-            outputResults = [results[results.length - 1]];
-          } else if (toolChain.output?.steps && toolChain.output.steps.length > 0) {
-            outputResults = toolChain.output.steps
-              .filter(stepIndex => stepIndex >= 0 && stepIndex < results.length)
-              .map(stepIndex => results[stepIndex]);
-          } else {
-            outputResults = results;
+          formatLog(
+            'DEBUG',
+            `Chain execution completed`
+          );
+
+          // 处理输出结果时添加安全检查
+          let outputResults: any[] = [];
+          try {
+            if (toolChain.output?.final) {
+              const finalResult = results[results.length - 1];
+              outputResults = finalResult ? [finalResult] : [];
+            } else if (toolChain.output?.steps && toolChain.output.steps.length > 0) {
+              outputResults = toolChain.output.steps
+                .filter(stepIndex => stepIndex >= 0 && stepIndex < results.length)
+                .map(stepIndex => results[stepIndex])
+                .filter(result => result !== undefined);
+            } else {
+              outputResults = results.filter(result => result !== undefined);
+            }
+          } catch (error) {
+            formatLog(
+              'ERROR',
+              `Failed to process output results: ${error.message}`
+            );
+            outputResults = [];
           }
 
           return {
             content: [{
               type: "text",
-              text: JSON.stringify(outputResults)
+              text: JSON.stringify(outputResults || [])
             }]
           };
         } finally {
@@ -313,7 +351,21 @@ export class McpServerComposer {
   }
 
   private getNestedValue(obj: any, path: string): any {
-    return path.split('.').reduce((current, key) => current?.[key], obj);
+    try {
+      return path.split('.')
+        .reduce((current, key) => {
+          if (current === undefined || current === null) {
+            return undefined;
+          }
+          return current[key];
+        }, obj);
+    } catch (error) {
+      formatLog(
+        'ERROR',
+        `Failed to get nested value for path "${path}": ${error.message}`
+      );
+      return undefined;
+    }
   }
 
   listTargetClients() {
@@ -327,27 +379,29 @@ export class McpServerComposer {
   }
 
   private composeTools(tools: Tool[], name: string) {
-    // @ts-ignore
+    //@ts-ignore
     const existingTools = this.server._registeredTools
-    
+    // 记录这个客户端支持的工具
+    const toolSet = new Set<string>()
     for (const tool of tools) {
+      toolSet.add(tool.name)
       if (existingTools[tool.name]) {
         continue
       }
       const schemaObject = jsonSchemaToZod(tool.inputSchema)
-      
+
       // 创建工具的执行函数
       const toolExecutor = async (args: any, client?: Client) => {
         let needToClose = false;
         let toolClient = client;
-        
+
         if (!toolClient) {
           // 如果没有传入client，说明是直接调用，需要创建新的连接
           const clientItem = this.targetClients.get(name);
           if (!clientItem) {
             throw new Error(`Client for ${name} not found`);
           }
-          
+
           toolClient = new Client(clientItem.clientInfo);
           await toolClient.connect(this.createTransport(clientItem.config));
           needToClose = true;  // 标记需要关闭连接
@@ -362,6 +416,10 @@ export class McpServerComposer {
           name: tool.name,
           arguments: args
         });
+        // if(tool.name=="browser_execute_javascript"){
+        //   console.log(args)
+        //   console.log(result)
+        // }
 
         if (needToClose) {
           await toolClient.close();
@@ -384,6 +442,7 @@ export class McpServerComposer {
       // @ts-ignore
       this.server._registeredTools[tool.name].needsClient = true;  // 标记为需要客户端
     }
+    this.clientTools.set(name, toolSet)
   }
 
   private composeResources(resources: Resource[], name: string) {
