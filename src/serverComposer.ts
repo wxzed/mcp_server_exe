@@ -21,44 +21,47 @@ import {
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
 
+const NAMESPACE_SEPARATOR = '::'
+
 type ConnectionConfig =
   | {
-    type: 'sse'
-    url: URL
-    params: SSEClientTransportOptions
-    tools: string[]
-    name: string
-  }
+      type: 'sse'
+      url: URL
+      params: SSEClientTransportOptions
+      tools: string[]
+      name: string
+    }
   | {
-    type: 'stdio'
-    params: StdioServerParameters
-    tools: string[]
-    name: string
-  }
+      type: 'stdio'
+      params: StdioServerParameters
+      tools: string[]
+      name: string
+    }
 
 interface ToolChainStep {
-  toolName: string;
-  args: any;
+  toolName: string
+  args: any
   outputMapping?: {
-    [key: string]: string; // 将当前步骤的输出映射到下一个步骤的输入
-  };
-  fromStep?: number;
+    [key: string]: string // 将当前步骤的输出映射到下一个步骤的输入
+  }
+  fromStep?: number
 }
 
 interface ToolChainOutput {
-  steps?: number[];  // 指定要输出的步骤索引，如果为空则输出所有步骤
-  final?: boolean;   // 是否只输出最后一步
+  steps?: number[] // 指定要输出的步骤索引，如果为空则输出所有步骤
+  final?: boolean // 是否只输出最后一步
 }
 
 interface ToolChain {
-  name: string;
-  steps: ToolChainStep[];
-  description?: string;
-  output?: ToolChainOutput;  // 添加输出配置
+  name: string
+  steps: ToolChainStep[]
+  description?: string
+  output?: ToolChainOutput // 添加输出配置
 }
 
 export class McpServerComposer {
   public readonly server: McpServer
+  public namespace: string = NAMESPACE_SEPARATOR
   private readonly targetClients: Map<
     string,
     {
@@ -68,11 +71,11 @@ export class McpServerComposer {
   > = new Map()
   private readonly clientTools: Map<string, Set<string>> = new Map()
 
-  constructor(serverInfo: Implementation) {
+  constructor (serverInfo: Implementation) {
     this.server = new McpServer(serverInfo)
   }
 
-  async add(
+  async add (
     config: ConnectionConfig,
     clientInfo: Implementation,
     skipRegister = false,
@@ -90,20 +93,22 @@ export class McpServerComposer {
       if (retryCount >= 2) {
         formatLog(
           'ERROR',
-          `Connection failed after 2 retries: ${config.type === 'sse' ? config.url : config.params.command
+          `Connection failed after 2 retries: ${
+            config.type === 'sse' ? config.url : config.params.command
           } -> ${clientInfo.name}\n` +
-          `Reason: ${(error as Error).message}\n` +
-          `Skipping connection...`
+            `Reason: ${(error as Error).message}\n` +
+            `Skipping connection...`
         )
         return
       }
 
       formatLog(
         'ERROR',
-        `Connection failed: ${config.type === 'sse' ? config.url : config.params.command
+        `Connection failed: ${
+          config.type === 'sse' ? config.url : config.params.command
         } -> ${clientInfo.name}\n` +
-        `Reason: ${(error as Error).message}\n` +
-        `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
+          `Reason: ${(error as Error).message}\n` +
+          `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
       )
 
       // If the connection fails, retry after 15 seconds
@@ -116,11 +121,12 @@ export class McpServerComposer {
 
     formatLog(
       'INFO',
-      `Successfully connected to server: ${config.type === 'sse' ? config.url : config.params.command
+      `Successfully connected to server: ${
+        config.type === 'sse' ? config.url : config.params.command
       } (${clientInfo.name})`
     )
 
-    const name = config.name;
+    const name = config.name
 
     this.targetClients.set(name, { clientInfo, config })
 
@@ -207,261 +213,270 @@ export class McpServerComposer {
     targetClient.close()
   }
 
-  composeToolChain(toolChain: ToolChain) {
+  composeToolChain (toolChain: ToolChain) {
     this.server.tool(
       toolChain.name,
       toolChain.description ?? 'Execute a chain of tools',
       {},
       async () => {
-        const results: any[] = [];
-        const clientsMap = new Map<string, Client>();
+        const results: any[] = []
+        const clientsMap = new Map<string, Client>()
 
         try {
           for (let i = 0; i < toolChain.steps.length; i++) {
-            const step = toolChain.steps[i];
-            
+            const step = toolChain.steps[i]
+
             // 查找所有注册的工具中匹配的工具（支持命名空间和非命名空间）
-            let registeredTool;
-            let foundToolName;
-            
+            let registeredTool
+            let foundToolName
+
             // @ts-ignore
-            for (const [name, tool] of Object.entries(this.server._registeredTools)) {
-              if (name === step.toolName || name.endsWith(`::${step.toolName}`)) {
-                registeredTool = tool;
-                foundToolName = name;
-                break;
+            for (const [name, tool] of Object.entries(
+              // @ts-ignore
+              this.server._registeredTools
+            )) {
+              if (
+                name === step.toolName ||
+                name.endsWith(`${this.namespace}${step.toolName}`)
+              ) {
+                registeredTool = tool
+                foundToolName = name
+                break
               }
             }
-            
+
             if (!registeredTool) {
-              throw new Error(`Tool not found: ${step.toolName}`);
+              throw new Error(`Tool not found: ${step.toolName}`)
             }
 
-            formatLog(
-              'DEBUG',
-              `Executing chain step ${i}: ${foundToolName}\n`
-            );
+            formatLog('DEBUG', `Executing chain step ${i}: ${foundToolName}\n`)
 
             if (step.outputMapping) {
-              const sourceResult = step.fromStep !== undefined
-                ? results[step.fromStep]
-                : results[results.length - 1];
+              const sourceResult =
+                step.fromStep !== undefined
+                  ? results[step.fromStep]
+                  : results[results.length - 1]
 
               if (sourceResult) {
                 for (const [key, path] of Object.entries(step.outputMapping)) {
                   try {
-                    const value = this.getNestedValue(sourceResult, path);
+                    const value = this.getNestedValue(sourceResult, path)
                     if (value !== undefined) {
-                      step.args[key] = value;
+                      step.args[key] = value
                     } else {
                       formatLog(
                         'INFO',
                         `Output mapping path "${path}" returned undefined for step ${i}`
-                      );
+                      )
                     }
                   } catch (error) {
                     formatLog(
                       'ERROR',
                       `Failed to map output for step ${i}: ${error.message}`
-                    );
+                    )
                   }
                 }
               }
             }
 
-            let result;
+            let result
             try {
               if (registeredTool.needsClient) {
-                let foundClientName: string | undefined;
+                let foundClientName: string | undefined
 
                 for (const [clientName, _] of this.targetClients.entries()) {
                   // 使用 clientTools 来判断客户端是否真的支持这个工具
                   const supportedTools = this.clientTools.get(clientName)
                   // 检查完整的命名空间工具名
                   if (supportedTools?.has(foundToolName)) {
-                    foundClientName = clientName;
-                    break;
+                    foundClientName = clientName
+                    break
                   }
                 }
 
                 if (!foundClientName) {
-                  throw new Error(`No client found for tool: ${foundToolName}`);
+                  throw new Error(`No client found for tool: ${foundToolName}`)
                 }
 
                 // 复用或创建客户端连接
-                let client = clientsMap.get(foundClientName);
+                let client = clientsMap.get(foundClientName)
                 if (!client) {
-                  const clientItem = this.targetClients.get(foundClientName);
+                  const clientItem = this.targetClients.get(foundClientName)
                   if (!clientItem) {
-                    throw new Error(`Client configuration not found for: ${foundClientName}`);
+                    throw new Error(
+                      `Client configuration not found for: ${foundClientName}`
+                    )
                   }
-                  client = new Client(clientItem.clientInfo);
-                  await client.connect(this.createTransport(clientItem.config));
-                  clientsMap.set(foundClientName, client);
+                  client = new Client(clientItem.clientInfo)
+                  await client.connect(this.createTransport(clientItem.config))
+                  clientsMap.set(foundClientName, client)
                 }
 
-                result = await registeredTool.chainExecutor(step.args, client);
+                result = await registeredTool.chainExecutor(step.args, client)
               } else {
                 // 本地工具直接调用
-                result = await registeredTool.callback(step.args);
+                result = await registeredTool.callback(step.args)
               }
 
               // 确保结果不是undefined
-              results.push(result || { content: [{ type: "text", text: "" }] });
+              results.push(result || { content: [{ type: 'text', text: '' }] })
             } catch (error) {
               formatLog(
                 'ERROR',
                 `Step ${i} (${foundToolName}) execution failed: ${error.message}`
-              );
+              )
               // 在错误时添加一个空结果
-              results.push({ content: [{ type: "text", text: `Error: ${error.message}` }] });
+              results.push({
+                content: [{ type: 'text', text: `Error: ${error.message}` }]
+              })
             }
           }
 
-          formatLog(
-            'DEBUG',
-            `Chain execution completed`
-          );
+          formatLog('DEBUG', `Chain execution completed`)
 
           // 处理输出结果时添加安全检查
-          let outputResults: any[] = [];
+          let outputResults: any[] = []
           try {
             if (toolChain.output?.final) {
-              const finalResult = results[results.length - 1];
-              outputResults = finalResult ? [finalResult] : [];
-            } else if (toolChain.output?.steps && toolChain.output.steps.length > 0) {
+              const finalResult = results[results.length - 1]
+              outputResults = finalResult ? [finalResult] : []
+            } else if (
+              toolChain.output?.steps &&
+              toolChain.output.steps.length > 0
+            ) {
               outputResults = toolChain.output.steps
-                .filter(stepIndex => stepIndex >= 0 && stepIndex < results.length)
+                .filter(
+                  stepIndex => stepIndex >= 0 && stepIndex < results.length
+                )
                 .map(stepIndex => results[stepIndex])
-                .filter(result => result !== undefined);
+                .filter(result => result !== undefined)
             } else {
-              outputResults = results.filter(result => result !== undefined);
+              outputResults = results.filter(result => result !== undefined)
             }
           } catch (error) {
             formatLog(
               'ERROR',
               `Failed to process output results: ${error.message}`
-            );
-            outputResults = [];
+            )
+            outputResults = []
           }
 
           return {
-            content: [{
-              type: "text",
-              text: JSON.stringify(outputResults || [])
-            }]
-          };
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(outputResults || [])
+              }
+            ]
+          }
         } finally {
           // 关闭所有客户端连接
           for (const client of clientsMap.values()) {
-            await client.close();
+            await client.close()
           }
         }
       }
-    );
+    )
   }
 
-  private getNestedValue(obj: any, path: string): any {
+  private getNestedValue (obj: any, path: string): any {
     try {
-      return path.split('.')
-        .reduce((current, key) => {
-          if (current === undefined || current === null) {
-            return undefined;
-          }
-          return current[key];
-        }, obj);
+      return path.split('.').reduce((current, key) => {
+        if (current === undefined || current === null) {
+          return undefined
+        }
+        return current[key]
+      }, obj)
     } catch (error) {
       formatLog(
         'ERROR',
         `Failed to get nested value for path "${path}": ${error.message}`
-      );
-      return undefined;
+      )
+      return undefined
     }
   }
 
-  listTargetClients() {
+  listTargetClients () {
     return Array.from(this.targetClients.values())
   }
 
-  private createTransport(config: ConnectionConfig) {
+  private createTransport (config: ConnectionConfig) {
     return config.type === 'sse'
       ? new SSEClientTransport(config.url)
       : new StdioClientTransport(config.params)
   }
 
-  private composeTools(tools: Tool[], name: string) {
+  private composeTools (tools: Tool[], name: string) {
     //@ts-ignore
     const existingTools = this.server._registeredTools
     // 记录这个客户端支持的工具
     const toolSet = new Set<string>()
-    
+
     for (const tool of tools) {
-        // 使用客户端名称作为命名空间
-        const namespacedToolName = `${name}::${tool.name}`
-        toolSet.add(namespacedToolName)
-        
-        if (existingTools[namespacedToolName]) {
-            continue
+      // 使用客户端名称作为命名空间
+      const namespacedToolName = `${name}${this.namespace}${tool.name}`
+      toolSet.add(namespacedToolName)
+
+      if (existingTools[namespacedToolName]) {
+        continue
+      }
+
+      const schemaObject = jsonSchemaToZod(tool.inputSchema)
+
+      // 创建工具执行函数
+      const toolExecutor = async (args: any, client?: Client) => {
+        let needToClose = false
+        let toolClient = client
+
+        if (!toolClient) {
+          // 如果没有传入client，说明是直接调用，需要创建新的连接
+          const clientItem = this.targetClients.get(name)
+          if (!clientItem) {
+            throw new Error(`Client for ${name} not found`)
+          }
+
+          toolClient = new Client(clientItem.clientInfo)
+          await toolClient.connect(this.createTransport(clientItem.config))
+          needToClose = true // 标记需要关闭连接
         }
-        
-        const schemaObject = jsonSchemaToZod(tool.inputSchema)
 
-        // 创建工具执行函数
-        const toolExecutor = async (args: any, client?: Client) => {
-            let needToClose = false;
-            let toolClient = client;
+        formatLog('DEBUG', `Calling tool: ${tool.name} from ${name}\n`)
 
-            if (!toolClient) {
-                // 如果没有传入client，说明是直接调用，需要创建新的连接
-                const clientItem = this.targetClients.get(name);
-                if (!clientItem) {
-                    throw new Error(`Client for ${name} not found`);
-                }
+        const result = await toolClient.callTool({
+          name: tool.name, // 调用原始工具名
+          arguments: args
+        })
 
-                toolClient = new Client(clientItem.clientInfo);
-                await toolClient.connect(this.createTransport(clientItem.config));
-                needToClose = true;  // 标记需要关闭连接
-            }
+        if (needToClose) {
+          await toolClient.close()
+        }
 
-            formatLog(
-                'DEBUG',
-                `Calling tool: ${tool.name} from ${name}\n`
-            );
+        return result as CallToolResult
+      }
 
-            const result = await toolClient.callTool({
-                name: tool.name,  // 调用原始工具名
-                arguments: args
-            });
-    
-            if (needToClose) {
-                await toolClient.close();
-            }
+      // 注册工具时使用带命名空间的名称
+      this.server.tool(
+        namespacedToolName,
+        `[${name}] ${tool.description ?? ''}`, // 在描述中标明来源
+        schemaObject,
+        async args => toolExecutor(args)
+      )
 
-            return result as CallToolResult;
-        };
-
-        // 注册工具时使用带命名空间的名称
-        this.server.tool(
-            namespacedToolName,
-            `[${name}] ${tool.description ?? ''}`,  // 在描述中标明来源
-            schemaObject,
-            async args => toolExecutor(args)
-        );
-
-        // 保存执行函数和标记为需要客户端的工具
-        // @ts-ignore
-        this.server._registeredTools[namespacedToolName].chainExecutor = toolExecutor;
-        // @ts-ignore
-        this.server._registeredTools[namespacedToolName].needsClient = true;
-        // 保存原始工具名到元数据中
-        // @ts-ignore
-        this.server._registeredTools[namespacedToolName].originalName = tool.name;
+      // 保存执行函数和标记为需要客户端的工具
+      // @ts-ignore
+      this.server._registeredTools[namespacedToolName].chainExecutor =
+        toolExecutor
+      // @ts-ignore
+      this.server._registeredTools[namespacedToolName].needsClient = true
+      // 保存原始工具名到元数据中
+      // @ts-ignore
+      this.server._registeredTools[namespacedToolName].originalName = tool.name
     }
-    
+
     this.clientTools.set(name, toolSet)
   }
 
-  private composeResources(resources: Resource[], name: string) {
+  private composeResources (resources: Resource[], name: string) {
     // @ts-ignore
     const existingResources = this.server._registeredResources
     //  console.log(existingResources,resources)
@@ -493,7 +508,7 @@ export class McpServerComposer {
     }
   }
 
-  private composePrompts(prompts: Prompt[], name: string) {
+  private composePrompts (prompts: Prompt[], name: string) {
     // @ts-ignore
     const existingPrompts = this.server._registeredPrompts
     for (const prompt of prompts) {
@@ -525,7 +540,7 @@ export class McpServerComposer {
     }
   }
 
-  private handleTargetServerClose(
+  private handleTargetServerClose (
     name: string,
     config: ConnectionConfig,
     clientInfo: Implementation
@@ -536,25 +551,26 @@ export class McpServerComposer {
       formatLog(
         'ERROR',
         `Server connection lost:\n` +
-        `- Name: ${name}\n` +
-        `- Type: ${config.type}\n` +
-        `- Config: ${config.type === 'sse' ? config.url : config.params.command
-        }\n` +
-        `- Client: ${clientInfo.name}\n` +
-        `Will try to reconnect in 10 seconds...`
+          `- Name: ${name}\n` +
+          `- Type: ${config.type}\n` +
+          `- Config: ${
+            config.type === 'sse' ? config.url : config.params.command
+          }\n` +
+          `- Client: ${clientInfo.name}\n` +
+          `Will try to reconnect in 10 seconds...`
       )
 
       return this.add(config, clientInfo, true)
     }
   }
 
-  async disconnectAll() {
+  async disconnectAll () {
     for (const client of this.targetClients.keys()) {
       await this.disconnect(client)
     }
   }
 
-  async disconnect(clientName: string) {
+  async disconnect (clientName: string) {
     const client = this.targetClients.get(clientName)
     if (client) {
       this.targetClients.delete(clientName)

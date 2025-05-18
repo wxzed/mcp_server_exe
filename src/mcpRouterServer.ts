@@ -9,6 +9,8 @@ import type { Express } from 'express'
 import { formatLog } from './utils/console'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 
+const NAMESPACE_SEPARATOR = '.'
+
 export class McpRouterServer {
   private readonly serverComposer: McpServerComposer
   private readonly transports: Record<
@@ -165,6 +167,8 @@ export class McpRouterServer {
 
   async importMcpConfig (config: any) {
     const targetServers = this.parseConfig(config)
+
+    this.serverComposer.namespace = config.namespace || NAMESPACE_SEPARATOR
 
     for (const targetServer of targetServers) {
       let config
