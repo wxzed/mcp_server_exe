@@ -3,9 +3,19 @@
 # MCP Server.exe
 > Cursor 的 MCP 启动器 - MCP For Cursor
 
-把 MCP (Model Context Protocol) 服务器制作成可执行文件，支持多种使用场景的部署和集成。
+MCP Server.exe 是一个强大的可执行服务器，它不仅能够运行标准的 MCP (Model Context Protocol) 服务，更提供了丰富的高级功能：
 
-Turn MCP (Model Context Protocol) server into an executable file, supporting various deployment and integration scenarios.
+- 工具链式调用：支持将多个工具按序组合，实现复杂的自动化流程
+- 多 MCP 服务组合：可同时运行和管理多个 MCP 服务，支持 SSE 和 stdio 双模式
+- 插件化工具系统：支持自定义工具的动态加载和配置
+- 灵活的部署选项：从单机运行到分布式部署，满足各类集成场景
+
+MCP Server.exe is a powerful executable server that not only runs standard MCP (Model Context Protocol) services, but also provides rich advanced features:
+
+- Tool Chain Execution: Support sequential combination of multiple tools for complex automation
+- Multiple MCP Services: Can run and manage multiple MCP services simultaneously, supporting both SSE and stdio modes
+- Pluggable Tool System: Support dynamic loading and configuration of custom tools
+- Flexible Deployment: From standalone operation to distributed deployment, meeting various integration scenarios
 
 ## 🎯 主要使用场景 | Main Usage Scenarios
 
@@ -52,7 +62,60 @@ Use the same **mcp.json** configuration file as **Cursor** to combine multiple M
 }
 ```
 
-### 3. 自定义工具的插件机制 | Custom Tools Plugin Mechanism
+### 3. 工具链式调用 | Tool Chain Execution
+
+支持将多个工具组合成工具链，实现复杂的自动化流程。工具链可以灵活配置数据流转和结果输出。
+
+Support combining multiple tools into a tool chain to implement complex automation processes. Tool chains can flexibly configure data flow and result output.
+
+```bash
+./mcp_server.exe --mcp-config ./examples/product-hunt/mcp-tool.json
+```
+
+配置示例 | Configuration Example (tool-chain.json):
+```json
+{
+    "toolChains": {
+        "browser_automation": {
+            "name": "browser_automation",
+            "description": "自动化浏览器操作流程 | Automated browser operation process",
+            "steps": [
+                {
+                    "toolName": "browser_navigate",
+                    "args": {
+                        "url": "https://example.com"
+                    }
+                },
+                {
+                    "toolName": "browser_execute_javascript",
+                    "args": {
+                        "code": "document.title"
+                    },
+                    "outputMapping": {
+                        "selector": "content.0.text"
+                    }
+                },
+                {
+                    "toolName": "browser_close",
+                    "args": {},
+                    "fromStep": 0
+                }
+            ],
+            "output": {
+                "steps": [1]  // 只输出第二步的结果
+            }
+        }
+    }
+}
+```
+
+工具链特性 | Tool Chain Features:
+- 支持多步骤顺序执行 | Support multi-step sequential execution
+- 灵活的数据流转映射 | Flexible data flow mapping
+- 可从任意步骤获取结果 | Can get results from any step
+- 自定义输出步骤结果 | Customize output step results
+
+### 4. 自定义工具的插件机制 | Custom Tools Plugin Mechanism
 
 通过 JavaScript 配置文件，灵活定义工具、资源和提示。
 
@@ -81,7 +144,7 @@ module.exports = {
 }
 ```
 
-### 4. 嵌入式集成 | Embedded Integration
+### 5. 嵌入式集成 | Embedded Integration
 
 作为独立进程集成到任何应用程序中。
 
