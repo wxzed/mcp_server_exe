@@ -62,7 +62,7 @@
         "output": {
             "steps": [3]
         },
-        "name": "product-hunt-tool-chain",
-        "description": "A chain of tools that process data sequentially"
+        "name": "product_hunt_news",
+        "description": "get product hunt news"
     }]
 }
