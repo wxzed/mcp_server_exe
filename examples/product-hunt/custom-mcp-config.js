@@ -10,8 +10,11 @@ function configureMcp(server, ResourceTemplate, z) {
         "load_product_hunt_js_code",
         'load product hunt js code', {},
         async() => {
+            // 取每十分钟一次的时间戳
+            const timestamp = Math.floor(Date.now() / 1000 / 600) * 600;
 
             const code = encodeURIComponent(`
+                const timestamp = ${timestamp};
 function extractProductInfo(doc) {
 
     // 3. 提取所有产品部分

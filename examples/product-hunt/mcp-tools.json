@@ -4,7 +4,9 @@
             "command": "/Users/shadow/Documents/GitHub/mcp-use-browser/dist/mcp-use-browser",
             "args": [
                 "--transport",
-                "stdio"
+                "stdio",
+                "--headless",
+                "true"
             ]
         }
     },
