@@ -27,11 +27,13 @@ type ConnectionConfig =
     url: URL
     params: SSEClientTransportOptions
     tools: string[]
+    name: string
   }
   | {
     type: 'stdio'
     params: StdioServerParameters
     tools: string[]
+    name: string
   }
 
 interface ToolChainStep {
@@ -118,8 +120,7 @@ export class McpServerComposer {
       } (${clientInfo.name})`
     )
 
-    const name =
-      config.type === 'sse' ? config.url.toString() : config.params.command
+    const name = config.name;
 
     this.targetClients.set(name, { clientInfo, config })
 
@@ -218,15 +219,27 @@ export class McpServerComposer {
         try {
           for (let i = 0; i < toolChain.steps.length; i++) {
             const step = toolChain.steps[i];
+            
+            // 查找所有注册的工具中匹配的工具（支持命名空间和非命名空间）
+            let registeredTool;
+            let foundToolName;
+            
             // @ts-ignore
-            const registeredTool = this.server._registeredTools[step.toolName];
+            for (const [name, tool] of Object.entries(this.server._registeredTools)) {
+              if (name === step.toolName || name.endsWith(`::${step.toolName}`)) {
+                registeredTool = tool;
+                foundToolName = name;
+                break;
+              }
+            }
+            
             if (!registeredTool) {
               throw new Error(`Tool not found: ${step.toolName}`);
             }
 
             formatLog(
               'DEBUG',
-              `Executing chain step ${i}: ${step.toolName}\n`
+              `Executing chain step ${i}: ${foundToolName}\n`
             );
 
             if (step.outputMapping) {
@@ -264,14 +277,15 @@ export class McpServerComposer {
                 for (const [clientName, _] of this.targetClients.entries()) {
                   // 使用 clientTools 来判断客户端是否真的支持这个工具
                   const supportedTools = this.clientTools.get(clientName)
-                  if (supportedTools?.has(step.toolName)) {
+                  // 检查完整的命名空间工具名
+                  if (supportedTools?.has(foundToolName)) {
                     foundClientName = clientName;
                     break;
                   }
                 }
 
                 if (!foundClientName) {
-                  throw new Error(`No client found for tool: ${step.toolName}`);
+                  throw new Error(`No client found for tool: ${foundToolName}`);
                 }
 
                 // 复用或创建客户端连接
@@ -284,8 +298,6 @@ export class McpServerComposer {
                   client = new Client(clientItem.clientInfo);
                   await client.connect(this.createTransport(clientItem.config));
                   clientsMap.set(foundClientName, client);
-                } else {
-                  // console.log('复用',foundClientName)
                 }
 
                 result = await registeredTool.chainExecutor(step.args, client);
@@ -299,12 +311,11 @@ export class McpServerComposer {
             } catch (error) {
               formatLog(
                 'ERROR',
-                `Step ${i} (${step.toolName}) execution failed: ${error.message}`
+                `Step ${i} (${foundToolName}) execution failed: ${error.message}`
               );
               // 在错误时添加一个空结果
               results.push({ content: [{ type: "text", text: `Error: ${error.message}` }] });
             }
-
           }
 
           formatLog(
@@ -383,65 +394,70 @@ export class McpServerComposer {
     const existingTools = this.server._registeredTools
     // 记录这个客户端支持的工具
     const toolSet = new Set<string>()
+    
     for (const tool of tools) {
-      toolSet.add(tool.name)
-      if (existingTools[tool.name]) {
-        continue
-      }
-      const schemaObject = jsonSchemaToZod(tool.inputSchema)
-
-      // 创建工具的执行函数
-      const toolExecutor = async (args: any, client?: Client) => {
-        let needToClose = false;
-        let toolClient = client;
-
-        if (!toolClient) {
-          // 如果没有传入client，说明是直接调用，需要创建新的连接
-          const clientItem = this.targetClients.get(name);
-          if (!clientItem) {
-            throw new Error(`Client for ${name} not found`);
-          }
-
-          toolClient = new Client(clientItem.clientInfo);
-          await toolClient.connect(this.createTransport(clientItem.config));
-          needToClose = true;  // 标记需要关闭连接
+        // 使用客户端名称作为命名空间
+        const namespacedToolName = `${name}::${tool.name}`
+        toolSet.add(namespacedToolName)
+        
+        if (existingTools[namespacedToolName]) {
+            continue
         }
+        
+        const schemaObject = jsonSchemaToZod(tool.inputSchema)
 
-        formatLog(
-          'DEBUG',
-          `Calling tool: ${tool.name}\n`
+        // 创建工具执行函数
+        const toolExecutor = async (args: any, client?: Client) => {
+            let needToClose = false;
+            let toolClient = client;
+
+            if (!toolClient) {
+                // 如果没有传入client，说明是直接调用，需要创建新的连接
+                const clientItem = this.targetClients.get(name);
+                if (!clientItem) {
+                    throw new Error(`Client for ${name} not found`);
+                }
+
+                toolClient = new Client(clientItem.clientInfo);
+                await toolClient.connect(this.createTransport(clientItem.config));
+                needToClose = true;  // 标记需要关闭连接
+            }
+
+            formatLog(
+                'DEBUG',
+                `Calling tool: ${tool.name} from ${name}\n`
+            );
+
+            const result = await toolClient.callTool({
+                name: tool.name,  // 调用原始工具名
+                arguments: args
+            });
+    
+            if (needToClose) {
+                await toolClient.close();
+            }
+
+            return result as CallToolResult;
+        };
+
+        // 注册工具时使用带命名空间的名称
+        this.server.tool(
+            namespacedToolName,
+            `[${name}] ${tool.description ?? ''}`,  // 在描述中标明来源
+            schemaObject,
+            async args => toolExecutor(args)
         );
 
-        const result = await toolClient.callTool({
-          name: tool.name,
-          arguments: args
-        });
-        // if(tool.name=="browser_execute_javascript"){
-        //   console.log(args)
-        //   console.log(result)
-        // }
-
-        if (needToClose) {
-          await toolClient.close();
-        }
-
-        return result as CallToolResult;
-      };
-
-      // 注册工具
-      this.server.tool(
-        tool.name,
-        tool.description ?? '',
-        schemaObject,
-        async args => toolExecutor(args)  // 直接调用模式
-      );
-
-      // 保存执行函数和标记为需要客户端的工具
-      // @ts-ignore
-      this.server._registeredTools[tool.name].chainExecutor = toolExecutor;
-      // @ts-ignore
-      this.server._registeredTools[tool.name].needsClient = true;  // 标记为需要客户端
+        // 保存执行函数和标记为需要客户端的工具
+        // @ts-ignore
+        this.server._registeredTools[namespacedToolName].chainExecutor = toolExecutor;
+        // @ts-ignore
+        this.server._registeredTools[namespacedToolName].needsClient = true;
+        // 保存原始工具名到元数据中
+        // @ts-ignore
+        this.server._registeredTools[namespacedToolName].originalName = tool.name;
     }
+    
     this.clientTools.set(name, toolSet)
   }
 

@@ -170,6 +170,7 @@ export class McpRouterServer {
       let config
       if (targetServer.type === 'sse') {
         config = {
+          name: targetServer.name,
           type: 'sse',
           url: new URL(targetServer.url),
           params: targetServer.params,
@@ -177,6 +178,7 @@ export class McpRouterServer {
         }
       } else {
         config = {
+          name: targetServer.name,
           type: 'stdio',
           params: targetServer.params,
           tools: targetServer.tools
