@@ -236,7 +236,7 @@ export class McpRouterServer {
       const serverInfo = this.serverComposer.server.server._serverInfo
 
       mcpConfig['mcpServers'][serverInfo.name] = {
-        url: `http://127.0.0.1:${port}/sse`
+        url: `http://127.0.0.1:${port}`
       }
 
       formatLog(
