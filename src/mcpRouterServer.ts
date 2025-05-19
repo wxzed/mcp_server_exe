@@ -213,10 +213,11 @@ export class McpRouterServer {
           this.serverComposer.server._registeredTools[name].disable()
         }
       }
-      // config.toolChains
-      for (const toolChain of config.toolChains) {
-        //@ts-ignore
-        this.serverComposer.server._registeredTools[toolChain.name].enable()
+      if (Array.isArray(config?.toolChains)) {
+        for (const toolChain of config.toolChains) {
+          //@ts-ignore
+          this.serverComposer.server._registeredTools[toolChain.name].enable()
+        }
       }
     }
   }
