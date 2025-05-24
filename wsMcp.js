@@ -1,7 +1,8 @@
 const WebSocket = require('ws')
 const fs = require('fs')
 const path = require('path')
-
+const { ResourceTemplate } = require('@modelcontextprotocol/sdk/server/mcp.js')
+const { z } = require('zod')
 // Import MCP server related modules
 const { McpRouterServer } = require('./dist/mcpRouterServer')
 const { loadServerConfig } = require('./dist/tools/serverConfig')
@@ -16,24 +17,24 @@ const logger = {
 
 // Create custom WebSocket transport class
 class WebSocketServerTransport {
-  constructor(ws) {
+  constructor (ws) {
     this.ws = ws
     this.onmessage = null
     this.onclose = null
     this.onerror = null
   }
 
-  async start() {
+  async start () {
     // Transport is already started when WebSocket connection is established
   }
 
-  async send(message) {
+  async send (message) {
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
     }
   }
 
-  async close() {
+  async close () {
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.close()
     }
@@ -45,6 +46,10 @@ const INITIAL_BACKOFF = 1000 // Initial wait time in milliseconds
 const MAX_BACKOFF = 600000 // Maximum wait time in milliseconds
 let reconnectAttempt = 0
 let backoff = INITIAL_BACKOFF
+
+// 添加全局变量来存储命令行参数
+let globalCliArgs = null
+let globalCustomConfigPath = null
 
 async function sleep (ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -90,16 +95,16 @@ async function connectToServer (uri) {
       try {
         // Create MCP server instance instead of starting a subprocess
         logger.info('Starting MCP server using direct call...')
-        
-        // Simulate command line argument processing
-        const customConfigPath = 'examples/test-config.js'
-        let cliArgs = {
+
+        // Use command line arguments instead of hardcoded values
+        const customConfigPath = globalCustomConfigPath
+        let cliArgs = globalCliArgs || {
           transport: 'stdio'
         }
 
         // Load configuration
         const config = loadServerConfig({}, cliArgs)
-        
+
         let mcpJSON = {}
         try {
           if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
@@ -122,14 +127,22 @@ async function connectToServer (uri) {
         // Load configuration file
         let configureMcp = null
         if (customConfigPath && fs.existsSync(customConfigPath)) {
-          const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
+          const customConfigFullPath = path.resolve(
+            process.cwd(),
+            customConfigPath
+          )
           logger.info(`Loading config file: ${customConfigFullPath}`)
 
           try {
             const customModule = require(customConfigFullPath)
-            
-            if (customModule.configureMcp && typeof customModule.configureMcp === 'function') {
-              logger.info('Found configureMcp function, will use it to configure MCP server')
+
+            if (
+              customModule.configureMcp &&
+              typeof customModule.configureMcp === 'function'
+            ) {
+              logger.info(
+                'Found configureMcp function, will use it to configure MCP server'
+              )
               configureMcp = customModule.configureMcp
             }
           } catch (error) {
@@ -138,16 +151,10 @@ async function connectToServer (uri) {
         }
 
         // Create router server instance, using stdio mode but not starting the actual stdio transport
-        routerServer = new McpRouterServer(serverInfo, {
-          port: config.port,
-          host: config.host ?? '0.0.0.0',
-          transportType: 'stdio'
-        })
+        routerServer = new McpRouterServer(serverInfo, {})
 
         // Configure MCP server's tools, resources, and prompts
         if (typeof configureMcp === 'function') {
-          const { ResourceTemplate } = require('@modelcontextprotocol/sdk/server/mcp.js')
-          const { z } = require('zod')
           configureMcp(routerServer.server, ResourceTemplate, z)
         }
 
@@ -156,7 +163,7 @@ async function connectToServer (uri) {
 
         // Create custom WebSocket transport
         const transport = new WebSocketServerTransport(ws)
-        
+
         // Connect MCP server to custom transport
         await routerServer.server.connect(transport)
 
@@ -165,7 +172,7 @@ async function connectToServer (uri) {
           try {
             const message = data.toString('utf-8')
             logger.debug(`<< ${message.slice(0, 120)}...`)
-            
+
             // Parse JSON message and pass it to MCP server
             const jsonMessage = JSON.parse(message)
             if (transport.onmessage) {
@@ -177,7 +184,6 @@ async function connectToServer (uri) {
         })
 
         logger.info('MCP server started successfully with direct call')
-
       } catch (error) {
         logger.error(`Failed to start MCP server: ${error.message}`)
         ws.close()
@@ -213,26 +219,81 @@ process.on('SIGINT', () => {
 
 // Main execution
 if (require.main === module) {
-  // Parse command line arguments
-  const args = process.argv.slice(2) // Remove node and script name
+  // Parse command line arguments - 参考 server.ts 的设计
+  const args = process.argv.slice(2)
   let websocketUrl = null
+  let customConfigPath = null
+
+  // 定义 cliArgs 对象
+  let cliArgs = {}
 
   // Parse arguments
   for (let i = 0; i < args.length; i++) {
+    // WebSocket URL 参数
     if (args[i] === '-ws' && i + 1 < args.length) {
       websocketUrl = args[i + 1]
-      i++ // Skip next argument as it's the URL
+      i++
+      continue
+    }
+
+    // MCP JavaScript 配置文件路径
+    if (args[i] === '--mcp-js' && i + 1 < args.length) {
+      customConfigPath = args[i + 1]
+      i++
+      continue
+    }
+ 
+    if (args[i] === '--mcp-config' && i + 1 < args.length) {
+      cliArgs.mcpConfig = args[i + 1]
+      i++
+      continue
+    }
+
+    // 帮助信息
+    if (args[i] === '--help' || args[i] === '-h') {
+      console.log(`
+使用方法: node wsMcp.js [选项]
+
+必需参数:
+  -ws <url>              WebSocket 服务器地址
+
+可选参数:
+  --mcp-js <path>        MCP JavaScript 配置文件路径
+  --mcp-config <path>    MCP JSON 配置文件路径
+  --help, -h             显示此帮助信息
+
+示例:
+  node wsMcp.js -ws ws://localhost:8080 --mcp-js examples/test-config.js
+  node wsMcp.js -ws ws://localhost:8080 --mcp-config examples/test-config.json
+      `)
+      process.exit(0)
     }
   }
+
+  if (!customConfigPath) {
+    customConfigPath = 'examples/test-config.js'
+    logger.info(
+      '未指定 --mcp-js 参数，使用默认配置文件路径: examples/test-config.js'
+    )
+  }
+
+  // 存储到全局变量供 connectToServer 使用
+  globalCliArgs = cliArgs
+  globalCustomConfigPath = customConfigPath
 
   // Get WebSocket URL from arguments
   const endpointUrl = websocketUrl
   if (!endpointUrl) {
-    logger.error('Usage: node ws.js -ws <websocket_url>')
+    logger.error('错误: 缺少 WebSocket URL 参数')
+    logger.error('使用方法: node wsMcp.js -ws <websocket_url> [其他选项]')
+    logger.error('使用 --help 查看完整帮助信息')
     process.exit(1)
   }
 
-  logger.info(`Using WebSocket URL: ${endpointUrl}`)
+  logger.info(`使用 WebSocket URL: ${endpointUrl}`)
+  if (customConfigPath) {
+    logger.info(`使用配置文件: ${customConfigPath}`)
+  }
 
   // Start main loop
   connectWithRetry(endpointUrl).catch(error => {
