@@ -31,7 +31,6 @@ export class McpRouterServer {
     this.serverComposer = new McpServerComposer(serverInfo)
     this.server = this.serverComposer.server
     this.transportType = serverOptions.transportType ?? 'sse'
-    this.setupRoutes()
   }
 
   private setupRoutes () {
@@ -222,6 +221,8 @@ export class McpRouterServer {
     }
   }
   start () {
+    this.setupRoutes()
+
     if (this.transportType === 'stdio') {
       formatLog('INFO', 'Server running in stdio mode')
       return
