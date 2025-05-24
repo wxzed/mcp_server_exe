@@ -30,6 +30,7 @@ class WebSocketServerTransport {
 
   async send (message) {
     if (this.ws.readyState === WebSocket.OPEN) {
+      logger.debug(`>> ${JSON.stringify(message)}`)
       this.ws.send(JSON.stringify(message))
     }
   }
@@ -171,7 +172,7 @@ async function connectToServer (uri) {
         ws.on('message', data => {
           try {
             const message = data.toString('utf-8')
-            logger.debug(`<< ${message.slice(0, 120)}...`)
+            logger.debug(`<< ${message.slice(0, 220)}...`)
 
             // Parse JSON message and pass it to MCP server
             const jsonMessage = JSON.parse(message)
@@ -230,7 +231,7 @@ if (require.main === module) {
   // Parse arguments
   for (let i = 0; i < args.length; i++) {
     // WebSocket URL 参数
-    if (args[i] === '-ws' && i + 1 < args.length) {
+    if (args[i] === '--ws' && i + 1 < args.length) {
       websocketUrl = args[i + 1]
       i++
       continue
