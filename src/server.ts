@@ -152,7 +152,6 @@ async function startServer () {
   try {
     // 加载所有目标服务器
     await routerServer.importMcpConfig(mcpJSON)
-    // console.log(routerServer.server)
     // 启动服务器
     routerServer.start()
   } catch (error) {
