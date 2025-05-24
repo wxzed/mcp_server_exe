@@ -74,6 +74,42 @@ export class WebSocketServer {
         try {
           this.logger.info('正在启动MCP服务器...')
 
+          // 创建WebSocket传输层
+          const transport = new WebSocketServerTransport(ws)
+
+          // 设置消息处理
+          ws.on('message', (data: WebSocket.Data) => {
+            try {
+              const message = data.toString('utf-8')
+              this.logger.debug(`<< ${message.slice(0, 320)}...`)
+
+              const jsonMessage = JSON.parse(message)
+
+              const tryProcessMessage = (
+                message: any,
+                attempt: number = 0,
+                maxAttempts: number = 120
+              ) => {
+                if (transport.onmessage) {
+                  transport.onmessage(message)
+                } else if (attempt < maxAttempts) {
+                  this.logger.debug(
+                    `等待onmessage可用，尝试次数: ${attempt + 1}`
+                  )
+                  setTimeout(() => {
+                    tryProcessMessage(message, attempt + 1, maxAttempts)
+                  }, 500)
+                } else {
+                  this.logger.error('达到最大重试次数，消息处理失败')
+                }
+              }
+
+              tryProcessMessage(jsonMessage)
+            } catch (error) {
+              this.logger.error(`处理消息时出错: ${error}`)
+            }
+          })
+
           // 创建路由服务器实例
           this.routerServer = new McpRouterServer(this.serverInfo, {})
 
@@ -83,28 +119,10 @@ export class WebSocketServer {
           }
 
           // 导入MCP配置
-          this.routerServer.importMcpConfig(this.mcpConfig)
-
-          // 创建WebSocket传输层
-          const transport = new WebSocketServerTransport(ws)
+          await this.routerServer.importMcpConfig(this.mcpConfig)
 
           // 连接MCP服务器到传输层
           await this.routerServer.server.connect(transport)
-
-          // 设置消息处理
-          ws.on('message', (data: WebSocket.Data) => {
-            try {
-              const message = data.toString('utf-8')
-              this.logger.debug(`<< ${message.slice(0, 320)}...`)
-
-              const jsonMessage = JSON.parse(message)
-              if (transport.onmessage) {
-                transport.onmessage(jsonMessage)
-              }
-            } catch (error) {
-              this.logger.error(`处理消息时出错: ${error}`)
-            }
-          })
 
           this.logger.info('MCP服务器启动成功')
         } catch (error) {
