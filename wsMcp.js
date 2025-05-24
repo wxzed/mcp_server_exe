@@ -159,14 +159,14 @@ async function connectToServer (uri) {
           configureMcp(routerServer.server, ResourceTemplate, z)
         }
 
-        // Load all target servers
-        await routerServer.importMcpConfig(mcpJSON)
-
-        // Create custom WebSocket transport
+        // 1. 首先创建WebSocket传输层
         const transport = new WebSocketServerTransport(ws)
 
-        // Connect MCP server to custom transport
+        // 2. 连接MCP服务器到传输层
         await routerServer.server.connect(transport)
+
+        // 3. 最后导入MCP配置
+        routerServer.importMcpConfig(mcpJSON)
 
         // Set message processing
         ws.on('message', data => {
@@ -243,7 +243,7 @@ if (require.main === module) {
       i++
       continue
     }
- 
+
     if (args[i] === '--mcp-config' && i + 1 < args.length) {
       cliArgs.mcpConfig = args[i + 1]
       i++
