@@ -8,7 +8,7 @@ interface JSONSchema {
 interface JSONSchemaProperty {
   type: string
   items?: JSONSchemaProperty
-  default?: any  // 添加默认值属性
+  default?: any // 添加默认值属性
 }
 
 /**
@@ -57,7 +57,7 @@ export function jsonSchemaToZod (
         const items = typedValue.items
         if (items && typeof items === 'object' && 'type' in items) {
           let arrayType: z.ZodArray<any>
-          
+
           if (items.type === 'string') {
             arrayType = z.array(z.string())
           } else if (items.type === 'number' || items.type === 'integer') {
@@ -67,7 +67,7 @@ export function jsonSchemaToZod (
           } else {
             arrayType = z.array(z.any())
           }
-          
+
           // 处理数组的默认值
           schemaObject[key] = createWithDefault(arrayType)
         } else {

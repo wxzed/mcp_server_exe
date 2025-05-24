@@ -1,11 +1,12 @@
-const { ResourceTemplate } = require('@modelcontextprotocol/sdk/server/mcp.js')
-
-const { z } = require('zod')
-
 const fs = require('fs')
 const path = require('path')
 const { loadServerConfig } = require('./tools/serverConfig.js')
-import { McpRouterServer } from './mcpRouterServer'
+const { McpRouterServer } = require('./mcpRouterServer')
+const { WebSocketServer } = require('./webSocketServer')
+
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+
 // 解析命令行参数
 const args = process.argv.slice(2)
 let customConfigPath = null
@@ -22,6 +23,7 @@ interface CliArgs {
   homepage?: string
   transport?: string
   mcpConfig?: string
+  ws?: string // 新增WebSocket URL参数
 }
 
 // 创建 cliArgs 对象
@@ -29,10 +31,17 @@ let cliArgs: CliArgs = {}
 
 // 处理命令行参数
 for (let i = 0; i < args.length; i++) {
+  // WebSocket URL参数
+  if (args[i] === '--ws' && i + 1 < args.length) {
+    cliArgs.ws = args[i + 1]
+    i++
+    continue
+  }
+
   // 只使用 --mcp-js 参数
   if (args[i] === '--mcp-js' && i + 1 < args.length) {
     customConfigPath = args[i + 1]
-    i++ // 跳过下一个参数，因为它是配置文件路径
+    i++
     continue
   }
   if (args[i] === '--server-name' && i + 1 < args.length) {
@@ -80,17 +89,44 @@ for (let i = 0; i < args.length; i++) {
     i++
     continue
   }
+  if (args[i] === '--help' || args[i] === '-h') {
+    console.log(`
+使用方法: node server.js [选项]
+
+必需参数:
+  无
+
+可选参数:
+  --ws <url>             WebSocket 服务器地址（如果指定，将使用WebSocket模式）
+  --mcp-js <path>        MCP JavaScript 配置文件路径
+  --mcp-config <path>    MCP JSON 配置文件路径
+  --server-name <name>   服务器名称
+  --port <port>          端口号
+  --version <version>    版本号
+  --description <desc>   描述
+  --author <author>      作者
+  --license <license>    许可证
+  --homepage <url>       主页
+  --transport <type>     传输类型 (sse/stdio)
+  --help, -h            显示此帮助信息
+
+示例:
+  node server.js --ws ws://localhost:8080
+  node server.js --port 3000 --transport sse
+    `)
+    process.exit(0)
+  }
 }
 
-// 设置 transport 默认值为 sse
-if (!cliArgs.transport) {
+// 设置 transport 默认值为 sse（如果不是WebSocket模式）
+if (!cliArgs.ws && !cliArgs.transport) {
   cliArgs.transport = 'sse'
 }
 
 // 合并配置
 const config = loadServerConfig({}, cliArgs)
 
-let mcpJSON:any = {}
+let mcpJSON: any = {}
 try {
   if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
     let text = fs.readFileSync(config.mcpConfig, 'utf8')
@@ -100,8 +136,7 @@ try {
   mcpJSON = {}
 }
 
-// console.log(config)
-const serverInfo =mcpJSON.serverInfo|| {
+const serverInfo = mcpJSON.serverInfo || {
   name: config.serverName,
   version: config.version,
   description: config.description,
@@ -109,7 +144,6 @@ const serverInfo =mcpJSON.serverInfo|| {
   license: config.license,
   homepage: config.homepage
 }
-
 
 // 加载配置文件
 let configureMcp = null
@@ -120,13 +154,11 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
 
   try {
     const customModule = require(customConfigFullPath)
- 
-    // 检查并加载 configureMcp 函数
+
     if (
       customModule.configureMcp &&
       typeof customModule.configureMcp === 'function'
     ) {
-      // 如果存在 configureMcp 函数，则使用它配置 MCP 服务器
       console.log('发现 configureMcp 函数，将用于配置 MCP 服务器')
       configureMcp = customModule.configureMcp
     }
@@ -135,26 +167,37 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
   }
 }
 
-
-// 2. 创建路由服务器实例
-const routerServer = new McpRouterServer(serverInfo, {
-  port: config.port,
-  host: config.host ?? '0.0.0.0',
-  transportType: config.transport as 'sse' | 'stdio'
-})
-
-// 配置MCP服务器的工具、资源和提示
-if (typeof configureMcp === 'function') {
-  configureMcp(routerServer.server, ResourceTemplate, z)
-}
-
 async function startServer () {
   try {
-    // 加载所有目标服务器
-    await routerServer.importMcpConfig(mcpJSON)
-    // console.log(routerServer.server)
-    // 启动服务器
-    routerServer.start()
+    if (cliArgs.ws) {
+      // WebSocket模式
+      console.log(`使用WebSocket模式，连接到: ${cliArgs.ws}`)
+      const wsServer = new WebSocketServer(
+        cliArgs.ws,
+        serverInfo,
+        server => {
+          if (typeof configureMcp === 'function') {
+            configureMcp(server, ResourceTemplate, z)
+          }
+        },
+        mcpJSON
+      )
+      await wsServer.start()
+    } else {
+      // 常规模式
+      const routerServer = new McpRouterServer(serverInfo, {
+        port: config.port,
+        host: config.host ?? '0.0.0.0',
+        transportType: config.transport as 'sse' | 'stdio'
+      })
+
+      if (typeof configureMcp === 'function') {
+        configureMcp(routerServer.server, ResourceTemplate, z)
+      }
+
+      await routerServer.importMcpConfig(mcpJSON)
+      routerServer.start()
+    }
   } catch (error) {
     console.error('启动服务器时发生错误:', error)
   }

@@ -1,6 +1,6 @@
 {
     "name": "mcp_server_exe",
-    "version": "0.3.6",
+    "version": "0.4.0",
     "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
     "scripts": {
@@ -27,7 +27,12 @@
             "src/**/*"
         ]
     },
-    "keywords": ["mcp", "server", "executable", "mcp_server.exe"],
+    "keywords": [
+        "mcp",
+        "server",
+        "executable",
+        "mcp_server.exe"
+    ],
     "author": "shadow",
     "license": "MIT",
     "bugs": {
@@ -38,15 +43,19 @@
         "@modelcontextprotocol/sdk": "^1.11.3",
         "@types/cors": "^2.8.18",
         "@types/uuid": "^10.0.0",
+        "@types/ws": "^8.18.1",
         "cors": "^2.8.5",
+        "dotenv": "^16.4.1",
         "express": "^4.18.2",
-        "uuid": "^11.1.0"
+        "uuid": "^11.1.0",
+        "ws": "^8.18.2"
     },
     "devDependencies": {
         "@types/express": "^4.17.21",
-        "@types/node": "^20.11.0",
+        "@types/node": "^20.17.50",
         "pkg": "^5.8.1",
+        "ts-node": "^10.9.2",
         "tsx": "^4.19.4",
-        "typescript": "^5.3.3"
+        "typescript": "^5.8.3"
     }
 }

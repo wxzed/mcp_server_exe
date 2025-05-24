@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "Model Server sse": {
+            "url": "http://127.0.0.1:3000"
+        } 
+    },
+    "serverInfo": {
+        "serverName": "ws-client-mcp-server", 
+        "version": "1.0.0",
+        "description": "WebSocket 客户端的 MCP 服务器实例",
+        "author": "shadow"
+    }
+}
