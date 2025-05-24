@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+        "Model Server sse": {
+            "url": "http://127.0.0.1:3000"
+        } 
+    },
+    "serverInfo": {
+        "serverName": "dynamic-mcp-server",
+        "port": 9090,
+        "version": "1.2.0",
+        "description": "动态配置的 MCP 服务器实例",
+        "author": "yourname"
+    }
+}
