@@ -19,7 +19,52 @@ MCP Server.exe is a powerful executable server that not only runs standard MCP (
 
 ## 🎯 主要使用场景 | Main Usage Scenarios
 
-### 1. 快速启动独立服务 | Quick Start Standalone Service
+### 1. WebSocket 连接模式 | WebSocket Connection Mode
+
+支持通过 WebSocket 连接到其他 MCP 服务，特别适合连接到 xiaozhi.me 等的接入。通过配置文件，可以轻松地将多个 MCP 服务接入到 xiaozhi.me。
+
+Support connecting to other MCP services via WebSocket, especially suitable for connecting to WebSocket-enabled MCP services like xiaozhi.me. Through configuration files, you can easily integrate multiple MCP services with xiaozhi.me.
+
+![xiaozhi-mcp](./assets/xiaozhi-mcp.png)
+
+```bash
+# 使用配置文件连接到 xiaozhi.me
+# Start in WebSocket mode
+./mcp_server.exe --ws wss://api.xiaozhi.me/mcp/?token=...xxx --mcp-config ./examples/mcp-sse.json
+
+```
+
+配置示例 | Configuration Example (mcp-sse.json):
+```json
+{
+    "mcpServers": {
+        "Model Server sse": {
+            "url": "http://127.0.0.1:3000"
+        },
+        "Model Server - stdio": {
+            "command": "xxxxx",
+            "args": [
+                "--transport",
+                "stdio"
+            ]
+        }
+    },
+    "serverInfo": {
+        "serverName": "ws-client-mcp-server", 
+        "version": "1.0.0",
+        "description": "WebSocket 客户端的 MCP 服务器实例",
+        "author": "shadow"
+    }
+}
+```
+
+WebSocket 模式特性 | WebSocket Mode Features:
+- 支持实时双向通信 | Support real-time bidirectional communication
+- 自动重连机制 | Automatic reconnection mechanism
+- 多服务统一管理 | Unified management of multiple services
+- 兼容标准 MCP 协议 | Compatible with standard MCP protocol
+
+### 2. 快速启动独立服务 | Quick Start Standalone Service
 
 最简单的使用方式 - 双击运行，即可启动一个标准的 MCP 服务。
 
@@ -36,7 +81,7 @@ The simplest way - double-click to run, and start a standard MCP service.
 - 支持标准端点 | Standard Endpoints: /mcp, /sse, /messages
 - 内置基础工具集 | Built-in Basic Tools
 
-### 2. 组合多个 MCP 服务 | Combine Multiple MCP Services
+### 3. 组合多个 MCP 服务 | Combine Multiple MCP Services
 
 使用和 **Cursor** 一致的 **mcp.json** 配置文件，通过配置文件组合多个 MCP 服务，支持同时使用 SSE 和 stdio 两种传输模式。这样可以根据不同的应用场景选择合适的传输方式，提高系统的灵活性和可扩展性。
 
@@ -62,7 +107,7 @@ Use the same **mcp.json** configuration file as **Cursor** to combine multiple M
 }
 ```
 
-### 3. 工具链式调用 | Tool Chain Execution
+### 4. 工具链式调用 | Tool Chain Execution
 
 支持将多个工具组合成工具链，实现复杂的自动化流程。工具链可以灵活配置数据流转和结果输出。
 
@@ -115,7 +160,7 @@ Support combining multiple tools into a tool chain to implement complex automati
 - 可从任意步骤获取结果 | Can get results from any step
 - 自定义输出步骤结果 | Customize output step results
 
-### 4. 自定义工具的插件机制 | Custom Tools Plugin Mechanism
+### 5. 自定义工具的插件机制 | Custom Tools Plugin Mechanism
 
 通过 JavaScript 配置文件，灵活定义工具、资源和提示。
 
@@ -144,7 +189,7 @@ module.exports = {
 }
 ```
 
-### 5. 嵌入式集成 | Embedded Integration
+### 6. 嵌入式集成 | Embedded Integration
 
 作为独立进程集成到任何应用程序中。
 
@@ -177,12 +222,7 @@ mcpServer.stdin.write(JSON.stringify({
 
 The server supports the following command line arguments to customize its behavior:
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--mcp-js <路径>` | 配置文件路径（包含服务器配置和 MCP 配置） | 内置配置 |
-| `--port <端口>` | 服务器监听端口 | 3000 |
-| `--mcp-config <路径>` | MCP 配置文件路径，用于组合多个 MCP 服务 | 无 |
-| `--transport <模式>` | 传输模式，支持 'sse' 或 'stdio' | sse |
+| 参数 | 说明 | 默认值 ||------|------|--------|| `--ws <url>` | WebSocket 服务器地址，启用 WebSocket 连接模式 | 无 || `--mcp-js <路径>` | 配置文件路径（包含服务器配置和 MCP 配置） | 内置配置 || `--port <端口>` | 服务器监听端口 | 3000 || `--mcp-config <路径>` | MCP 配置文件路径，用于组合多个 MCP 服务 | 无 || `--transport <模式>` | 传输模式，支持 'sse' 或 'stdio' | sse |
 
 ### 配置文件格式 | Configuration File Format
 
