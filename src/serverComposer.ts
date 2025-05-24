@@ -147,9 +147,14 @@ export class McpServerComposer {
     )
 
     if (capabilities?.tools) {
+      let tools: any = null
       try {
-        const tools = await targetClient.listTools()
-
+        tools = await targetClient.listTools()
+      } catch (error) {
+        console.log('Tool list:::error ',error)
+      }
+   
+      try {
         this.composeTools(tools.tools, name)
 
         formatLog(
@@ -407,73 +412,119 @@ export class McpServerComposer {
   }
 
   private composeTools (tools: Tool[], name: string) {
-    //@ts-ignore
-    const existingTools = this.server._registeredTools
-    // 记录这个客户端支持的工具
-    const toolSet = new Set<string>()
-
-    for (const tool of tools) {
-      // 使用客户端名称作为命名空间
-      const namespacedToolName = `${name}${this.namespace}${tool.name}`
-      toolSet.add(namespacedToolName)
-
-      if (existingTools[namespacedToolName]) {
-        continue
-      }
-
-      const schemaObject = jsonSchemaToZod(tool.inputSchema)
-
-      // 创建工具执行函数
-      const toolExecutor = async (args: any, client?: Client) => {
-        let needToClose = false
-        let toolClient = client
-
-        if (!toolClient) {
-          // 如果没有传入client，说明是直接调用，需要创建新的连接
-          const clientItem = this.targetClients.get(name)
-          if (!clientItem) {
-            throw new Error(`Client for ${name} not found`)
-          }
-
-          toolClient = new Client(clientItem.clientInfo)
-          await toolClient.connect(this.createTransport(clientItem.config))
-          needToClose = true // 标记需要关闭连接
-        }
-
-        formatLog('DEBUG', `Calling tool: ${tool.name} from ${name}\n`)
-
-        const result = await toolClient.callTool({
-          name: tool.name, // 调用原始工具名
-          arguments: args
-        })
-
-        if (needToClose) {
-          await toolClient.close()
-        }
-
-        return result as CallToolResult
-      }
-
-      // 注册工具时使用带命名空间的名称
-      this.server.tool(
-        namespacedToolName,
-        `[${name}] ${tool.description ?? ''}`, // 在描述中标明来源
-        schemaObject,
-        async args => toolExecutor(args)
-      )
-
-      // 保存执行函数和标记为需要客户端的工具
-      // @ts-ignore
-      this.server._registeredTools[namespacedToolName].chainExecutor =
-        toolExecutor
-      // @ts-ignore
-      this.server._registeredTools[namespacedToolName].needsClient = true
-      // 保存原始工具名到元数据中
-      // @ts-ignore
-      this.server._registeredTools[namespacedToolName].originalName = tool.name
+    if (!Array.isArray(tools)) {
+      throw new Error('Tools must be an array')
+    }
+    if (!name || typeof name !== 'string') {
+      throw new Error('Name must be a non-empty string')
     }
 
-    this.clientTools.set(name, toolSet)
+    try {
+      //@ts-ignore
+      const existingTools = this.server._registeredTools
+      // 记录这个客户端支持的工具
+      const toolSet = new Set<string>()
+
+      for (const tool of tools) {
+        try {
+          if (!tool.name) {
+            throw new Error('Tool name is required')
+          }
+
+          // 使用客户端名称作为命名空间
+          const namespacedToolName = `${name}${this.namespace}${tool.name}`
+          toolSet.add(namespacedToolName)
+
+          if (existingTools[namespacedToolName]) {
+            formatLog('INFO', `Tool ${namespacedToolName} already exists, skipping...`)
+            continue
+          }
+
+          let schemaObject
+          try {
+            schemaObject = jsonSchemaToZod(tool.inputSchema)
+          } catch (error) {
+            throw new Error(`Failed to convert schema for tool ${tool.name}: ${error.message}`)
+          }
+
+          // 创建工具执行函数
+          const toolExecutor = async (args: any, client?: Client) => {
+            let needToClose = false
+            let toolClient = client
+
+            try {
+              if (!toolClient) {
+                // 如果没有传入client，说明是直接调用，需要创建新的连接
+                const clientItem = this.targetClients.get(name)
+                if (!clientItem) {
+                  throw new Error(`Client for ${name} not found`)
+                }
+
+                toolClient = new Client(clientItem.clientInfo)
+                try {
+                  await toolClient.connect(this.createTransport(clientItem.config))
+                  needToClose = true // 标记需要关闭连接
+                } catch (error) {
+                  throw new Error(`Failed to connect to client: ${error.message}`)
+                }
+              }
+
+              formatLog('DEBUG', `Calling tool: ${tool.name} from ${name}\n`)
+
+              try {
+                const result = await toolClient.callTool({
+                  name: tool.name, // 调用原始工具名
+                  arguments: args
+                })
+                return result as CallToolResult
+              } catch (error) {
+                throw new Error(`Tool execution failed: ${error.message}`)
+              }
+            } finally {
+              if (needToClose && toolClient) {
+                try {
+                  await toolClient.close()
+                } catch (closeError) {
+                  formatLog('ERROR', `Failed to close client connection: ${closeError.message}`)
+                }
+              }
+            }
+          }
+
+          try {
+            // 注册工具时使用带命名空间的名称
+            this.server.tool(
+              namespacedToolName,
+              `[${name}] ${tool.description ?? ''}`, // 在描述中标明来源
+              schemaObject,
+              async args => toolExecutor(args)
+            )
+
+            // 保存执行函数和标记为需要客户端的工具
+            // @ts-ignore
+            this.server._registeredTools[namespacedToolName].chainExecutor = toolExecutor
+            // @ts-ignore
+            this.server._registeredTools[namespacedToolName].needsClient = true
+            // 保存原始工具名到元数据中
+            // @ts-ignore
+            this.server._registeredTools[namespacedToolName].originalName = tool.name
+
+            formatLog('INFO', `Successfully registered tool: ${namespacedToolName}`)
+          } catch (error) {
+            throw new Error(`Failed to register tool ${namespacedToolName}: ${error.message}`)
+          }
+        } catch (error) {
+          formatLog('ERROR', `Failed to process tool: ${error.message}`)
+          throw error // 重新抛出错误以便上层处理
+        }
+      }
+
+      this.clientTools.set(name, toolSet)
+      formatLog('INFO', `Successfully registered ${toolSet.size} tools for ${name}`)
+    } catch (error) {
+      formatLog('ERROR', `Failed to compose tools: ${error.message}`)
+      throw error // 重新抛出错误以便上层处理
+    }
   }
 
   private composeResources (resources: Resource[], name: string) {
