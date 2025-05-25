@@ -1,0 +1,47 @@
+{
+    "mcpServers": {
+        "content_repo": {
+            "command": "C:\\Users\\38957\\Documents\\GitHub\\spider.ai\\mcp\\mcp_server_content_repo.exe",
+            "args": [
+                "--transport",
+                "stdio",
+                "--database_path",
+                "C:/Users/38957/Documents/GitHub/spider.ai/dist/content_repo.db"
+            ]
+        }
+    },
+    "serverInfo": {
+        "name": "Content",
+        "version": "1.0.0",
+        "description": "Content",
+        "author": "shadow"
+    },
+    "namespace": ".",
+    "tools": [],
+    "toolChains": [
+        {
+            "steps": [
+                {
+                    "toolName": "content_repo.get_database_stats",
+                    "args": {
+                        "sample_count": "2"
+                    }
+                }
+            ],
+            "name": "get_database_stats",
+            "description": "get_database_stats"
+        },
+        {
+            "steps": [
+                {
+                    "toolName": "content_repo.content_select_sql",
+                    "args": {
+                        "query": "select * from content_repo"
+                    }
+                }
+            ],
+            "name": "content_select_sql",
+            "description": "content_select_sql"
+        }
+    ]
+}
