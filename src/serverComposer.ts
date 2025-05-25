@@ -151,9 +151,9 @@ export class McpServerComposer {
       try {
         tools = await targetClient.listTools()
       } catch (error) {
-        console.log('Tool list:::error ',error)
+        console.log('Tool list:::error ', error)
       }
-   
+
       try {
         this.composeTools(tools.tools, name)
 
@@ -222,14 +222,33 @@ export class McpServerComposer {
     this.server.tool(
       toolChain.name,
       toolChain.description ?? 'Execute a chain of tools',
-      {},
-      async () => {
+      toolChain.steps[0]?.args
+        ? jsonSchemaToZod({
+            type: 'object',
+            properties: Object.fromEntries(
+              Object.entries(toolChain.steps[0].args).map(([key, value]) => [
+                key,
+                {
+                  type: typeof value,
+                  default: value
+                }
+              ])
+            ),
+            required: Object.keys(toolChain.steps[0].args)
+          })
+        : {},
+      async (args: any = {}) => {
         const results: any[] = []
         const clientsMap = new Map<string, Client>()
 
         try {
           for (let i = 0; i < toolChain.steps.length; i++) {
             const step = toolChain.steps[i]
+
+            if (i == 0) {
+              //第一个，需要处理入参
+              step.args = { ...(step.args || {}), ...args }
+            }
 
             // 查找所有注册的工具中匹配的工具（支持命名空间和非命名空间）
             let registeredTool
@@ -436,7 +455,10 @@ export class McpServerComposer {
           toolSet.add(namespacedToolName)
 
           if (existingTools[namespacedToolName]) {
-            formatLog('INFO', `Tool ${namespacedToolName} already exists, skipping...`)
+            formatLog(
+              'INFO',
+              `Tool ${namespacedToolName} already exists, skipping...`
+            )
             continue
           }
 
@@ -444,7 +466,9 @@ export class McpServerComposer {
           try {
             schemaObject = jsonSchemaToZod(tool.inputSchema)
           } catch (error) {
-            throw new Error(`Failed to convert schema for tool ${tool.name}: ${error.message}`)
+            throw new Error(
+              `Failed to convert schema for tool ${tool.name}: ${error.message}`
+            )
           }
 
           // 创建工具执行函数
@@ -462,10 +486,14 @@ export class McpServerComposer {
 
                 toolClient = new Client(clientItem.clientInfo)
                 try {
-                  await toolClient.connect(this.createTransport(clientItem.config))
+                  await toolClient.connect(
+                    this.createTransport(clientItem.config)
+                  )
                   needToClose = true // 标记需要关闭连接
                 } catch (error) {
-                  throw new Error(`Failed to connect to client: ${error.message}`)
+                  throw new Error(
+                    `Failed to connect to client: ${error.message}`
+                  )
                 }
               }
 
@@ -485,7 +513,10 @@ export class McpServerComposer {
                 try {
                   await toolClient.close()
                 } catch (closeError) {
-                  formatLog('ERROR', `Failed to close client connection: ${closeError.message}`)
+                  formatLog(
+                    'ERROR',
+                    `Failed to close client connection: ${closeError.message}`
+                  )
                 }
               }
             }
@@ -502,16 +533,23 @@ export class McpServerComposer {
 
             // 保存执行函数和标记为需要客户端的工具
             // @ts-ignore
-            this.server._registeredTools[namespacedToolName].chainExecutor = toolExecutor
+            this.server._registeredTools[namespacedToolName].chainExecutor =
+              toolExecutor
             // @ts-ignore
             this.server._registeredTools[namespacedToolName].needsClient = true
             // 保存原始工具名到元数据中
             // @ts-ignore
-            this.server._registeredTools[namespacedToolName].originalName = tool.name
+            this.server._registeredTools[namespacedToolName].originalName =
+              tool.name
 
-            formatLog('INFO', `Successfully registered tool: ${namespacedToolName}`)
+            formatLog(
+              'INFO',
+              `Successfully registered tool: ${namespacedToolName}`
+            )
           } catch (error) {
-            throw new Error(`Failed to register tool ${namespacedToolName}: ${error.message}`)
+            throw new Error(
+              `Failed to register tool ${namespacedToolName}: ${error.message}`
+            )
           }
         } catch (error) {
           formatLog('ERROR', `Failed to process tool: ${error.message}`)
@@ -520,7 +558,10 @@ export class McpServerComposer {
       }
 
       this.clientTools.set(name, toolSet)
-      formatLog('INFO', `Successfully registered ${toolSet.size} tools for ${name}`)
+      formatLog(
+        'INFO',
+        `Successfully registered ${toolSet.size} tools for ${name}`
+      )
     } catch (error) {
       formatLog('ERROR', `Failed to compose tools: ${error.message}`)
       throw error // 重新抛出错误以便上层处理
