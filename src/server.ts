@@ -3,9 +3,11 @@ const path = require('path')
 const { loadServerConfig } = require('./tools/serverConfig.js')
 const { McpRouterServer } = require('./mcpRouterServer')
 const { WebSocketServer } = require('./webSocketServer')
-
+import { formatLog } from './utils/console'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+
+let currentServer: any = null
 
 // 解析命令行参数
 const args = process.argv.slice(2)
@@ -90,7 +92,7 @@ for (let i = 0; i < args.length; i++) {
     continue
   }
   if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`
+    formatLog('INFO', `
 使用方法: node server.js [选项]
 
 必需参数:
@@ -126,31 +128,43 @@ if (!cliArgs.ws && !cliArgs.transport) {
 // 合并配置
 const config = loadServerConfig({}, cliArgs)
 
-let mcpJSON: any = {}
-try {
-  if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
-    let text = fs.readFileSync(config.mcpConfig, 'utf8')
-    mcpJSON = JSON.parse(text)
+// 加载本地配置
+const loadConfig = (config: any) => {
+  let mcpJSON: any = {},
+    serverInfo: any = {}
+  try {
+    // 1. 重新加载 MCP JSON 配置文件
+    if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
+      const text = fs.readFileSync(config.mcpConfig, 'utf8')
+      mcpJSON = JSON.parse(text)
+    } else {
+      formatLog('INFO', `配置文件 ${config.mcpConfig} 在加载时未找到，将使用空配置。`)
+      mcpJSON = {}
+    }
+
+    // 2. 基于新的 mcpJSON (和原始 config) 更新 serverInfo
+    serverInfo = mcpJSON.serverInfo || {
+      name: config.serverName,
+      version: config.version,
+      description: config.description,
+      author: config.author,
+      license: config.license,
+      homepage: config.homepage
+    }
+  } catch (error) {
+    formatLog('ERROR', `加载配置文件失败: ${error.message}`)
   }
-} catch (error) {
-  mcpJSON = {}
+  return { mcpJSON, serverInfo }
 }
 
-const serverInfo = mcpJSON.serverInfo || {
-  name: config.serverName,
-  version: config.version,
-  description: config.description,
-  author: config.author,
-  license: config.license,
-  homepage: config.homepage
-}
+let { mcpJSON, serverInfo } = loadConfig(config)
 
 // 加载配置文件
 let configureMcp = null
 
 if (customConfigPath && fs.existsSync(customConfigPath)) {
   const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
-  console.log(`加载配置文件: ${customConfigFullPath}`)
+  formatLog('INFO', `加载配置文件: ${customConfigFullPath}`)
 
   try {
     const customModule = require(customConfigFullPath)
@@ -159,48 +173,114 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
       customModule.configureMcp &&
       typeof customModule.configureMcp === 'function'
     ) {
-      console.log('发现 configureMcp 函数，将用于配置 MCP 服务器')
+      formatLog('INFO', '发现 configureMcp 函数，将用于配置 MCP 服务器')
       configureMcp = customModule.configureMcp
     }
   } catch (error) {
-    console.error(`加载配置文件失败: ${error.message}`)
+    formatLog('ERROR', `加载配置文件失败: ${error.message}`)
   }
 }
 
 async function startServer () {
+  // 停止现有的服务器实例（如果存在）
+  if (currentServer) {
+    formatLog('INFO', '检测到重启请求，正在停止当前服务...')
+    try {
+      // 尝试调用 close() 方法，这是推荐的异步关闭方法
+      if (typeof (currentServer as any).close === 'function') {
+        await (currentServer as any).close()
+      } else {
+        formatLog('INFO', '当前服务实例没有可识别的 stop 或 close 方法。可能无法完全停止旧实例。')
+      }
+      formatLog('INFO', '旧服务实例已处理停止请求。')
+    } catch (stopError) {
+      formatLog('ERROR', '停止旧服务实例时发生错误:')
+      // 即使停止旧服务失败，也应尝试启动新服务
+    }
+    currentServer = null // 清除对旧服务器实例的引用
+  }
+
   try {
     if (cliArgs.ws) {
       // WebSocket模式
-      console.log(`使用WebSocket模式，连接到: ${cliArgs.ws}`)
+      formatLog('INFO', `使用WebSocket模式，连接到: ${cliArgs.ws}`)
       const wsServer = new WebSocketServer(
         cliArgs.ws,
-        serverInfo,
+        serverInfo, // 使用更新后的全局 serverInfo
         server => {
           if (typeof configureMcp === 'function') {
             configureMcp(server, ResourceTemplate, z)
           }
         },
-        mcpJSON
+        mcpJSON // 使用更新后的全局 mcpJSON
       )
+      currentServer = wsServer // 将新实例赋值给 currentServer
       await wsServer.start()
     } else {
       // 常规模式
       const routerServer = new McpRouterServer(serverInfo, {
+        // 使用更新后的全局 serverInfo
         port: config.port,
         host: config.host ?? '0.0.0.0',
         transportType: config.transport as 'sse' | 'stdio'
       })
+      currentServer = routerServer // 将新实例赋值给 currentServer
 
       if (typeof configureMcp === 'function') {
         configureMcp(routerServer.server, ResourceTemplate, z)
       }
 
-      await routerServer.importMcpConfig(mcpJSON)
+      await routerServer.importMcpConfig(mcpJSON) // 使用更新后的全局 mcpJSON
       routerServer.start()
     }
+    formatLog('INFO', '服务已成功启动或重启。')
   } catch (error) {
-    console.error('启动服务器时发生错误:', error)
+    formatLog('ERROR', '启动服务器时发生错误:')
+    currentServer = null // 如果启动失败，确保 currentServer 为空
   }
 }
+
+// --- 新增：监听配置文件变化并自动重启服务 ---
+let debounceTimeout: NodeJS.Timeout | null = null
+
+function debounceRestart (delay: number) {
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout)
+  }
+  debounceTimeout = setTimeout(() => {
+    formatLog('INFO', '开始重新加载配置并重启服务...')
+
+    try {
+      let newConfig = loadConfig(config)
+
+      mcpJSON = newConfig.mcpJSON
+      serverInfo = newConfig.serverInfo
+
+      formatLog('INFO', 'ServerInfo 已基于新配置更新。')
+
+      // 3. 调用 startServer 以重启服务
+      // startServer 函数内部已包含停止旧服务和启动新服务的逻辑
+      startServer()
+    } catch (reloadError) {
+      formatLog('ERROR', `重新加载配置或重启服务时发生错误: ${reloadError.message}`)
+      // 在这种情况下，之前的服务（如果仍在运行）将继续运行，或者服务可能已停止。
+      // 用户可能需要手动干预。
+    }
+  }, delay)
+}
+
+if (config.mcpConfig && fs.existsSync(config.mcpConfig)) {
+  formatLog('INFO', `正在监听配置文件: ${config.mcpConfig} 的变化以进行自动重启...`)
+  fs.watchFile(config.mcpConfig, { interval: 1000 }, (curr, prev) => {
+    // fs.watchFile 检查文件的修改时间 (mtime)
+    if (curr.mtime !== prev.mtime) {
+      formatLog('INFO', `检测到配置文件 ${config.mcpConfig} 已修改。`)
+      debounceRestart(2000) // 设置2秒的防抖延迟后重启
+    }
+  })
+} else if (config.mcpConfig) {
+  formatLog('INFO', `指定的 MCP JSON 配置文件 ${config.mcpConfig} 不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`)
+}
+// --- 文件监听逻辑结束 ---
 
 startServer()
