@@ -254,32 +254,37 @@ export class McpRouterServer {
    * 关闭服务器及其所有连接
    * @returns Promise<void> 当所有资源都已清理完毕时解决
    */
-  async close(): Promise<void> {
+  async close (): Promise<void> {
     try {
+      // 断开所有连接
+      this.serverComposer.disconnectAll()
+
       // 1. 关闭所有活跃的传输连接
-      const closePromises = Object.entries(this.transports).map(async ([sessionId, transport]) => {
-        try {
-          formatLog('INFO', `正在关闭会话 ${sessionId}...`)
-          if (transport instanceof ExpressSSEServerTransport) {
-            // 如果传输有自己的关闭方法，调用它
-            if (typeof transport.close === 'function') {
-              await transport.close()
+      const closePromises = Object.entries(this.transports).map(
+        async ([sessionId, transport]) => {
+          try {
+            formatLog('INFO', `正在关闭会话 ${sessionId}...`)
+            if (transport instanceof ExpressSSEServerTransport) {
+              // 如果传输有自己的关闭方法，调用它
+              if (typeof transport.close === 'function') {
+                await transport.close()
+              }
+              // 调用 onclose 回调（如果存在）
+              if (transport.onclose) {
+                transport.onclose()
+              }
+            } else if (transport instanceof StdioServerTransport) {
+              // 关闭 stdio 传输
+              if (typeof transport.close === 'function') {
+                await transport.close()
+              }
             }
-            // 调用 onclose 回调（如果存在）
-            if (transport.onclose) {
-              transport.onclose()
-            }
-          } else if (transport instanceof StdioServerTransport) {
-            // 关闭 stdio 传输
-            if (typeof transport.close === 'function') {
-              await transport.close()
-            }
+            delete this.transports[sessionId]
+          } catch (error) {
+            formatLog('ERROR', `关闭会话 ${sessionId} 时出错: ${error.message}`)
           }
-          delete this.transports[sessionId]
-        } catch (error) {
-          formatLog('ERROR', `关闭会话 ${sessionId} 时出错: ${error.message}`)
         }
-      })
+      )
 
       // 等待所有传输连接关闭
       await Promise.all(closePromises)
@@ -287,7 +292,7 @@ export class McpRouterServer {
       // 2. 关闭 HTTP 服务器（如果在 SSE 模式下）
       if (this.httpServer) {
         await new Promise<void>((resolve, reject) => {
-          this.httpServer!.close((err) => {
+          this.httpServer!.close(err => {
             if (err) {
               formatLog('ERROR', `关闭 HTTP 服务器时出错: ${err.message}`)
               reject(err)
