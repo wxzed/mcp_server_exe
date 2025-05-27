@@ -73,7 +73,21 @@ export class McpServerComposer {
   private readonly clientTools: Map<string, Set<string>> = new Map()
 
   constructor (serverInfo: Implementation) {
-    this.server = new McpServer(serverInfo)
+    this.server = new McpServer(serverInfo, {
+      capabilities: {
+        logging: {}, // 启用日志能力
+        resources: {
+          // 其他能力也可以一起设置
+          listChanged: true
+        },
+        tools: {
+          listChanged: true
+        },
+        prompts: {
+          listChanged: true
+        }
+      }
+    })
 
     // 确保 _registeredTools 被初始化
     // @ts-ignore
@@ -90,7 +104,6 @@ export class McpServerComposer {
       listTools: () => this.listTools(),
       findTool: (toolName: string) => this.findTool(toolName)
     }
- 
   }
 
   async add (
