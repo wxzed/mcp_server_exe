@@ -1,4 +1,4 @@
-import type { Implementation } from '@modelcontextprotocol/sdk/types.js'
+import type { Implementation  } from '@modelcontextprotocol/sdk/types.js'
 import { McpServerComposer } from './serverComposer'
 import { ExpressSSEServerTransport } from './expressSseTransport'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -22,6 +22,7 @@ export class McpRouterServer {
   private httpServer: Server | null = null
   private readonly transportType: 'sse' | 'stdio'
   public readonly server: McpServer
+
   constructor (
     serverInfo: Implementation,
     private readonly serverOptions: {
