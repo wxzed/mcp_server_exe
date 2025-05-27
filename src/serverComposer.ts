@@ -93,7 +93,8 @@ export class McpServerComposer {
 
     // 绑定发送日志消息方法
     // @ts-ignore
-    this.server._sendLoggingMessage = this.server.server.sendLoggingMessage
+    this.server._sendLoggingMessage = (params: any) =>
+      this.server.server.sendLoggingMessage(params)
   }
 
   async add (
