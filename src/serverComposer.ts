@@ -90,11 +90,7 @@ export class McpServerComposer {
       listTools: () => this.listTools(),
       findTool: (toolName: string) => this.findTool(toolName)
     }
-
-    // 绑定发送日志消息方法
-    // @ts-ignore
-    this.server._sendLoggingMessage = (params: any) =>
-      this.server.server.sendLoggingMessage(params)
+ 
   }
 
   async add (
