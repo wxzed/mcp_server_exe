@@ -127,9 +127,9 @@ export class McpRouterServer {
     })
 
     // API endpoint
-    this.app.get('/api/list-mcp-servers', (_, res) => {
-      res.json(this.serverComposer.listTargetClients())
-    })
+    // this.app.get('/api/list-mcp-servers', (_, res) => {
+    //   res.json(this.serverComposer.listTargetClients())
+    // })
 
     // 404 handler
     this.app.use((_, res) => {
