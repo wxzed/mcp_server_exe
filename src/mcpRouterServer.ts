@@ -53,8 +53,15 @@ export class McpRouterServer {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
       credentials: true, // Allow credentials
-      maxAge: 86400 // Preflight request cache time (seconds)
+      maxAge: 186400 // Preflight request cache time (seconds)
     }
+
+    // 设置请求超时时间为30秒
+    this.app.use((req, res, next) => {
+      req.setTimeout(240000); // 240秒
+      res.setTimeout(240000); // 240秒
+      next();
+    });
 
     // Enable CORS
     this.app.use(cors(corsOptions))
