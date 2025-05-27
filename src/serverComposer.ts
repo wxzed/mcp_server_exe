@@ -62,6 +62,7 @@ interface ToolChain {
 export class McpServerComposer {
   public readonly server: McpServer
   public namespace: string = NAMESPACE_SEPARATOR
+
   private readonly targetClients: Map<
     string,
     {
@@ -73,7 +74,7 @@ export class McpServerComposer {
 
   constructor (serverInfo: Implementation) {
     this.server = new McpServer(serverInfo)
-    
+
     // 确保 _registeredTools 被初始化
     // @ts-ignore
     if (!this.server._registeredTools) {
@@ -89,6 +90,10 @@ export class McpServerComposer {
       listTools: () => this.listTools(),
       findTool: (toolName: string) => this.findTool(toolName)
     }
+
+    // 绑定发送日志消息方法
+    // @ts-ignore
+    this.server._sendLoggingMessage = this.server.server.sendLoggingMessage
   }
 
   async add (
@@ -695,7 +700,10 @@ export class McpServerComposer {
     try {
       const tools = this.getRegisteredTools()
       for (const [name, tool] of Object.entries(tools)) {
-        if (name === toolName || name.endsWith(`${this.namespace}${toolName}`)) {
+        if (
+          name === toolName ||
+          name.endsWith(`${this.namespace}${toolName}`)
+        ) {
           return { tool, fullName: name }
         }
       }
@@ -718,7 +726,8 @@ export class McpServerComposer {
       const tools = []
       // @ts-ignore
       for (const [name, tool] of Object.entries(this.server._registeredTools)) {
-        if (tool) {  // 添加工具对象存在性检查
+        if (tool) {
+          // 添加工具对象存在性检查
           tools.push({
             name,
             // @ts-ignore
@@ -799,8 +808,8 @@ export class McpServerComposer {
     return this.findTool(toolName) !== null
   }
 
-  private getRegisteredTools() {
+  private getRegisteredTools () {
     // @ts-ignore
-    return this.server._registeredTools || {}  // 假设 McpServer 有 _registeredTools 
+    return this.server._registeredTools || {} // 假设 McpServer 有 _registeredTools
   }
 }
