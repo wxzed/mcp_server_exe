@@ -162,24 +162,30 @@ let { mcpJSON, serverInfo } = loadConfig(config)
 // 加载配置文件
 let configureMcp = null
 
-if (customConfigPath && fs.existsSync(customConfigPath)) {
-  const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
-  formatLog('INFO', `加载配置文件: ${customConfigFullPath}`)
+const loadCustomConfig = () => {
+  if (customConfigPath && fs.existsSync(customConfigPath)) {
+    const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
+    formatLog('INFO', `加载配置文件: ${customConfigFullPath}`)
 
-  try {
-    const customModule = require(customConfigFullPath)
+    try {
+      // 清除require缓存以确保重新加载最新的文件
+      delete require.cache[require.resolve(customConfigFullPath)]
+      const customModule = require(customConfigFullPath)
 
-    if (
-      customModule.configureMcp &&
-      typeof customModule.configureMcp === 'function'
-    ) {
-      formatLog('INFO', '发现 configureMcp 函数，将用于配置 MCP 服务器')
-      configureMcp = customModule.configureMcp
+      if (customModule.configureMcp && typeof customModule.configureMcp === 'function') {
+        formatLog('INFO', '发现 configureMcp 函数，将用于配置 MCP 服务器')
+        configureMcp = customModule.configureMcp
+        return true
+      }
+    } catch (error) {
+      formatLog('ERROR', `加载配置文件失败: ${error.message}`)
     }
-  } catch (error) {
-    formatLog('ERROR', `加载配置文件失败: ${error.message}`)
   }
+  return false
 }
+
+// 初始加载自定义配置
+loadCustomConfig()
 
 async function startServer () {
   // 停止现有的服务器实例（如果存在）
@@ -251,20 +257,20 @@ function debounceRestart (delay: number) {
     formatLog('INFO', '开始重新加载配置并重启服务...')
 
     try {
+      // 重新加载 MCP JSON 配置
       let newConfig = loadConfig(config)
-
       mcpJSON = newConfig.mcpJSON
       serverInfo = newConfig.serverInfo
-
       formatLog('INFO', 'ServerInfo 已基于新配置更新。')
 
-      // 3. 调用 startServer 以重启服务
-      // startServer 函数内部已包含停止旧服务和启动新服务的逻辑
+      // 重新加载自定义配置文件
+      loadCustomConfig()
+      formatLog('INFO', '自定义配置已重新加载。')
+
+      // 调用 startServer 以重启服务
       startServer()
     } catch (reloadError) {
       formatLog('ERROR', `重新加载配置或重启服务时发生错误: ${reloadError.message}`)
-      // 在这种情况下，之前的服务（如果仍在运行）将继续运行，或者服务可能已停止。
-      // 用户可能需要手动干预。
     }
   }, delay)
 }
@@ -280,6 +286,20 @@ if (config.mcpConfig && fs.existsSync(config.mcpConfig)) {
   })
 } else if (config.mcpConfig) {
   formatLog('INFO', `指定的 MCP JSON 配置文件 ${config.mcpConfig} 不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`)
+}
+
+// 监听自定义配置文件（--mcp-js）的变化
+if (customConfigPath && fs.existsSync(customConfigPath)) {
+  const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
+  formatLog('INFO', `正在监听自定义配置文件: ${customConfigFullPath} 的变化以进行自动重启...`)
+  fs.watchFile(customConfigFullPath, { interval: 1000 }, (curr, prev) => {
+    if (curr.mtime !== prev.mtime) {
+      formatLog('INFO', `检测到自定义配置文件 ${customConfigFullPath} 已修改。`)
+      debounceRestart(2000)
+    }
+  })
+} else if (customConfigPath) {
+  formatLog('INFO', `指定的自定义配置文件 ${customConfigPath} 不存在，无法监听其变化。`)
 }
 // --- 文件监听逻辑结束 ---
 
