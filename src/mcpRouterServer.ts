@@ -1,4 +1,4 @@
-import type { Implementation  } from '@modelcontextprotocol/sdk/types.js'
+import type { Implementation } from '@modelcontextprotocol/sdk/types.js'
 import { McpServerComposer } from './serverComposer'
 import { ExpressSSEServerTransport } from './expressSseTransport'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -9,19 +9,40 @@ import type { Express } from 'express'
 import { formatLog } from './utils/console'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 import type { Server } from 'http'
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
 
 const NAMESPACE_SEPARATOR = '.'
 
 export class McpRouterServer {
-  private readonly serverComposer: McpServerComposer
-  private readonly transports: Record<
-    string,
-    ExpressSSEServerTransport | StdioServerTransport
-  > = {}
-  private app: Express
+  private app!: Express
   private httpServer: Server | null = null
   private readonly transportType: 'sse' | 'stdio'
-  public readonly server: McpServer
+  private readonly baseServerInfo: Implementation
+  private parsedConfig: {
+    targetServers: McpServerType[]
+    toolChains: any[]
+    toolsFilter: string[]
+    namespace: string
+    configureMcp: Function | null
+  } | null = null
+
+  private readonly sseSessions: Map<
+    string,
+    {
+      composer: McpServerComposer
+      server: McpServer
+      transport: ExpressSSEServerTransport
+    }
+  > = new Map()
+
+  private stdioComposer: McpServerComposer | null = null
+  private stdioServer: McpServer | null = null
+  private stdioTransport: StdioServerTransport | null = null
+
+  // 添加默认SSE服务器实例，用于WebSocket等场景
+  private defaultSseComposer: McpServerComposer | null = null
+  private defaultSseServer: McpServer | null = null
 
   constructor (
     serverInfo: Implementation,
@@ -31,115 +52,121 @@ export class McpRouterServer {
       transportType?: 'sse' | 'stdio'
     }
   ) {
-    this.serverComposer = new McpServerComposer(serverInfo)
-    this.server = this.serverComposer.server
+    this.baseServerInfo = serverInfo
     this.transportType = serverOptions.transportType ?? 'sse'
+
+    // 初始化默认服务器实例
+    if (this.transportType === 'sse') {
+      this.defaultSseComposer = new McpServerComposer(this.baseServerInfo)
+      this.defaultSseServer = this.defaultSseComposer.server
+    }
   }
 
-  private setupRoutes () {
+  private async setupRoutes () {
     if (this.transportType === 'stdio') {
-      // stdio 模式
-      const transport = new StdioServerTransport()
-      this.serverComposer.server.connect(transport)
-      this.transports['stdio'] = transport
-      formatLog('INFO', 'Server initialized in stdio mode')
+      formatLog('INFO', 'Initializing server in stdio mode...')
+      this.stdioComposer = new McpServerComposer(this.baseServerInfo)
+      this.stdioServer = this.stdioComposer.server
+      this.stdioTransport = new StdioServerTransport()
+
+      if (this.parsedConfig) {
+        await this._applyConfigurationToComposer(
+          this.stdioComposer,
+          this.stdioServer,
+          this.parsedConfig.configureMcp
+        )
+      }
+
+      this.stdioServer.connect(this.stdioTransport)
+      formatLog('INFO', 'Server initialized and connected in stdio mode')
       return
     }
 
+    // SSE Mode
     this.app = express()
-    // SSE 模式
-    // Configure CORS
     const corsOptions = {
-      origin: '*', // Allow all origins, consider setting specific domains in production
+      origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      credentials: true, // Allow credentials
-      maxAge: 186400 // Preflight request cache time (seconds)
+      credentials: true,
+      maxAge: 186400
     }
 
-    // 设置请求超时时间为30秒
     this.app.use((req, res, next) => {
-      req.setTimeout(240000); // 240秒
-      res.setTimeout(240000); // 240秒
-      next();
-    });
+      req.setTimeout(240000)
+      res.setTimeout(240000)
+      next()
+    })
 
-    // Enable CORS
     this.app.use(cors(corsOptions))
-
-    // Support JSON request body parsing
     this.app.use(express.json())
 
-    const transports = {
-      streamable: new Map(),
-      sse: new Map()
-    }
-
-    // 现代化Streamable HTTP端点
-    // app.all('/mcp', async (req, res) => {
-    //   const transport = new StreamableHTTPServerTransport({
-    //     sessionIdGenerator: () => uuidv4(),
-    //     onsessioninitialized: (sessionId) => {
-    //       console.log(`新会话已初始化: ${sessionId}`);
-    //     }
-    //   });
-
-    //   if (transport.sessionId) {
-    //     transports.streamable.set(transport.sessionId, transport);
-
-    //     res.on("close", () => {
-    //       if (transport.sessionId) {
-    //         transports.streamable.delete(transport.sessionId);
-    //       }
-    //     });
-
-    //     await transport.handleRequest(req, res, req.body);
-    //     await server.connect(transport);
-    //   }
-    // });
-
-    // SSE connection endpoint
-    this.app.get('/', (_, res) => {
+    this.app.get('/', async (_, res) => {
+      formatLog('INFO', 'New SSE connection request received.')
+      const composer = new McpServerComposer(this.baseServerInfo)
+      const server = composer.server
       const transport = new ExpressSSEServerTransport('/sessions')
-      this.serverComposer.server.connect(transport)
-      transport.onclose = () => {
-        formatLog('INFO', `Session ${transport.sessionId} closed`)
-        delete this.transports[transport.sessionId]
+
+      if (this.parsedConfig) {
+        await this._applyConfigurationToComposer(composer, server, this.parsedConfig.configureMcp)
       }
-      this.transports[transport.sessionId] = transport
-      formatLog('INFO', `Session ${transport.sessionId} opened`)
+
+      server.connect(transport)
+
+      transport.onclose = () => {
+        formatLog(
+          'INFO',
+          `SSE transport for session ${transport.sessionId} closed.`
+        )
+        const sessionData = this.sseSessions.get(transport.sessionId)
+        if (sessionData) {
+          formatLog(
+            'INFO',
+            `Closing McpServer and cleaning up resources for session ${transport.sessionId}.`
+          )
+          sessionData.server.close()
+          this.sseSessions.delete(transport.sessionId)
+          formatLog('INFO', `Session ${transport.sessionId} fully cleaned up.`)
+        } else {
+          formatLog(
+            'INFO',
+            `onclose called for session ${transport.sessionId}, but session not found in map.`
+          )
+        }
+      }
+
+      this.sseSessions.set(transport.sessionId, {
+        composer,
+        server,
+        transport
+      })
+      formatLog(
+        'INFO',
+        `Session ${transport.sessionId} opened and McpServer instance created.`
+      )
       transport.handleSSERequest(res)
     })
 
-    // Message handling endpoint
     this.app.post('/sessions', (req, res) => {
       const sessionId = req.query.sessionId as string
-      if (!sessionId || !this.transports[sessionId]) {
-        res.status(400).send('Invalid session ID')
+      const sessionData = this.sseSessions.get(sessionId)
+
+      if (!sessionData) {
+        formatLog('INFO', `Invalid or unknown session ID: ${sessionId}`)
+        res.status(404).send('Session not found or invalid session ID')
         return
       }
-      const transport = this.transports[sessionId]
-      if (transport instanceof ExpressSSEServerTransport) {
-        transport.handlePostMessage(req, res)
-      } else {
-        res.status(400).send('Invalid transport type')
-      }
+
+      sessionData.transport.handlePostMessage(req, res)
     })
 
-    // API endpoint
-    // this.app.get('/api/list-mcp-servers', (_, res) => {
-    //   res.json(this.serverComposer.listTargetClients())
-    // })
-
-    // 404 handler
     this.app.use((_, res) => {
       res.status(404).send('Not found')
     })
 
-    // Error handling middleware
     this.app.use(
       (err: Error, _, res: express.Response, next: express.NextFunction) => {
-        formatLog('ERROR', err.message)
+        formatLog('ERROR', `Unhandled error: ${err.message} ${err.stack ?? ''}`)
         res.status(500).send('Internal server error')
         next()
       }
@@ -167,38 +194,41 @@ export class McpRouterServer {
     return targetServers
   }
 
-  parseToolChains (config: any) {
-    const toolChains = config?.toolChains || []
-    for (const toolChain of toolChains) {
-      this.serverComposer.composeToolChain(toolChain)
+  private async _applyConfigurationToComposer (
+    composer: McpServerComposer,
+    server: McpServer,
+    configureMcp: Function | null
+  ) {
+    if (!this.parsedConfig) {
+      formatLog('DEBUG', 'No parsed config available to apply to composer.')
+      return
     }
-  }
 
-  async importMcpConfig (config: any) {
-    const targetServers = this.parseConfig(config)
+    composer.namespace = this.parsedConfig.namespace
 
-    this.serverComposer.namespace = config.namespace || NAMESPACE_SEPARATOR
+    if (typeof configureMcp === 'function') {
+      configureMcp(server, ResourceTemplate, z)
+    }
 
-    for (const targetServer of targetServers) {
-      let config
+    for (const targetServer of this.parsedConfig.targetServers) {
+      let mcpClientConfig
       if (targetServer.type === 'sse') {
-        config = {
+        mcpClientConfig = {
           name: targetServer.name,
           type: 'sse',
-          url: new URL(targetServer.url),
+          url: new URL(targetServer.url!),
           params: targetServer.params,
           tools: targetServer.tools
         }
       } else {
-        config = {
+        mcpClientConfig = {
           name: targetServer.name,
           type: 'stdio',
           params: targetServer.params,
           tools: targetServer.tools
         }
       }
-      // console.log(targetServer)
-      await this.serverComposer.add(config, {
+      await composer.add(mcpClientConfig, {
         name:
           targetServer.name ??
           (targetServer.url
@@ -209,32 +239,89 @@ export class McpRouterServer {
       })
     }
 
-    this.parseToolChains(config)
+    for (const toolChain of this.parsedConfig.toolChains) {
+      composer.composeToolChain(toolChain)
+    }
 
-    // tools的开关
-    const tools = config?.tools || []
+    const registeredTools = server['_registeredTools']
 
-    if (tools.length > 0) {
-      //@ts-ignore
-      for (const name in this.serverComposer.server._registeredTools) {
-        if (!tools.includes(name)) {
-          //@ts-ignore
-          this.serverComposer.server._registeredTools[name].disable()
+    if (this.parsedConfig.toolsFilter.length > 0) {
+      for (const name in registeredTools) {
+        if (!this.parsedConfig.toolsFilter.includes(name)) {
+          ;(registeredTools[name] as any).disable()
         }
       }
-      if (Array.isArray(config?.toolChains)) {
-        for (const toolChain of config.toolChains) {
-          //@ts-ignore
-          this.serverComposer.server._registeredTools[toolChain.name].enable()
+    }
+
+    if (Array.isArray(this.parsedConfig.toolChains)) {
+      for (const toolChain of this.parsedConfig.toolChains) {
+        if (registeredTools[toolChain.name]) {
+          ;(registeredTools[toolChain.name] as any).enable()
         }
       }
     }
   }
-  start () {
-    this.setupRoutes()
+
+  public getActiveServer (): McpServer {
+    if (this.transportType === 'stdio' && this.stdioServer) {
+      return this.stdioServer
+    }
+    if (this.transportType === 'sse' && this.defaultSseServer) {
+      return this.defaultSseServer
+    }
+    throw new Error('No active server available')
+  }
+
+  async importMcpConfig (config: any, configureMcp: Function | null) {
+    const targetServers = this.parseConfig(config)
+    const toolChains = config?.toolChains || []
+    const namespace = config.namespace || NAMESPACE_SEPARATOR
+    const toolsFilter = config?.tools || []
+
+    this.parsedConfig = {
+      targetServers,
+      toolChains,
+      toolsFilter,
+      namespace,
+      configureMcp
+    }
+
+    // 为默认SSE服务器应用配置
+    if (
+      this.transportType === 'sse' &&
+      this.defaultSseComposer &&
+      this.defaultSseServer
+    ) {
+      await this._applyConfigurationToComposer(
+        this.defaultSseComposer,
+        this.defaultSseServer,
+        this.parsedConfig.configureMcp
+      )
+    }
+
+    // 为stdio服务器应用配置
+    if (
+      this.transportType === 'stdio' &&
+      this.stdioComposer &&
+      this.stdioServer
+    ) {
+      formatLog(
+        'INFO',
+        'Applying new configuration to existing stdio server instance.'
+      )
+      await this._applyConfigurationToComposer(
+        this.stdioComposer,
+        this.stdioServer,
+        this.parsedConfig.configureMcp
+      )
+    }
+  }
+
+  async start () {
+    await this.setupRoutes()
 
     if (this.transportType === 'stdio') {
-      formatLog('INFO', 'Server running in stdio mode')
+      formatLog('INFO', 'Server running in stdio mode.')
       return
     }
 
@@ -242,70 +329,118 @@ export class McpRouterServer {
     const host = this.serverOptions.host ?? '0.0.0.0'
 
     this.httpServer = this.app.listen(port, host, () => {
-      let mcpConfig = { mcpServers: {} }
-      // @ts-ignore
-      const serverInfo = this.serverComposer.server.server._serverInfo
+      const hostAddress = host === '0.0.0.0' ? '127.0.0.1' : host
+      const serverUrl = `http://${hostAddress}:${port}`
 
-      mcpConfig['mcpServers'][serverInfo.name] = {
-        url: `http://127.0.0.1:${port}`
+      const conceptualServerName =
+        this.baseServerInfo.name || 'mcpSessionServer'
+
+      const mcpConfigDisplay = {
+        mcpServers: {
+          [conceptualServerName]: {
+            url: serverUrl,
+            description:
+              'Connect to this URL for an SSE-based MCP session. Each connection gets a dedicated server instance.'
+          }
+        }
+      }
+      if (this.parsedConfig) {
+        mcpConfigDisplay['routerConfiguration'] = {
+          namespace: this.parsedConfig.namespace
+        }
       }
 
       formatLog(
         'INFO',
-        `\n\nMCP Server Config: ${JSON.stringify(mcpConfig, null, 2)}\n\n`
+        `\n\nConceptual MCP Server Config (new instance per SSE connection): ${JSON.stringify(
+          mcpConfigDisplay,
+          null,
+          2
+        )}\n\n`
       )
-      formatLog('INFO', `\n\nMCP Server(sse) running on port ${port}\n\n`)
+      formatLog(
+        'INFO',
+        `\n\nMCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`
+      )
+    })
+
+    this.httpServer.on('error', error => {
+      formatLog('ERROR', `HTTP server error: ${error.message}`)
     })
   }
 
-  /**
-   * 关闭服务器及其所有连接
-   * @returns Promise<void> 当所有资源都已清理完毕时解决
-   */
   async close (): Promise<void> {
     try {
-      // 断开所有连接
-      this.serverComposer.disconnectAll()
+      formatLog('INFO', 'Shutting down McpRouterServer...')
 
-      // 1. 关闭所有活跃的传输连接
-      const closePromises = Object.entries(this.transports).map(
-        async ([sessionId, transport]) => {
+      if (this.transportType === 'sse') {
+        // 关闭默认SSE服务器
+        if (this.defaultSseServer) {
           try {
-            formatLog('INFO', `正在关闭会话 ${sessionId}...`)
-            if (transport instanceof ExpressSSEServerTransport) {
-              // 如果传输有自己的关闭方法，调用它
-              if (typeof transport.close === 'function') {
-                await transport.close()
-              }
-              // 调用 onclose 回调（如果存在）
-              if (transport.onclose) {
-                transport.onclose()
-              }
-            } else if (transport instanceof StdioServerTransport) {
-              // 关闭 stdio 传输
-              if (typeof transport.close === 'function') {
-                await transport.close()
-              }
-            }
-            delete this.transports[sessionId]
+            await this.defaultSseServer.close()
+            this.defaultSseServer = null
+            this.defaultSseComposer = null
           } catch (error) {
-            formatLog('ERROR', `关闭会话 ${sessionId} 时出错: ${error.message}`)
+            formatLog(
+              'ERROR',
+              `Error closing default SSE server: ${(error as Error).message}`
+            )
           }
         }
-      )
 
-      // 等待所有传输连接关闭
-      await Promise.all(closePromises)
+        const sseServerClosePromises = Array.from(
+          this.sseSessions.values()
+        ).map(async sessionData => {
+          try {
+            formatLog(
+              'INFO',
+              `Closing McpServer for session ${sessionData.transport.sessionId}...`
+            )
+            await sessionData.server.close()
+          } catch (error) {
+            formatLog(
+              'ERROR',
+              `Error closing McpServer for session ${
+                sessionData.transport.sessionId
+              }: ${(error as Error).message}`
+            )
+          }
+        })
+        await Promise.all(sseServerClosePromises)
 
-      // 2. 关闭 HTTP 服务器（如果在 SSE 模式下）
+        if (this.sseSessions.size > 0) {
+          formatLog(
+            'INFO',
+            `${this.sseSessions.size} SSE sessions still in map after close attempts. Forcibly clearing.`
+          )
+          this.sseSessions.clear()
+        }
+      }
+
+      if (this.transportType === 'stdio' && this.stdioServer) {
+        formatLog('INFO', 'Closing stdio McpServer...')
+        try {
+          await this.stdioServer.close()
+        } catch (error) {
+          formatLog(
+            'ERROR',
+            `Error closing stdio McpServer: ${(error as Error).message}`
+          )
+        }
+        this.stdioServer = null
+        this.stdioComposer = null
+        this.stdioTransport = null
+      }
+
       if (this.httpServer) {
+        formatLog('INFO', 'Closing HTTP server...')
         await new Promise<void>((resolve, reject) => {
           this.httpServer!.close(err => {
             if (err) {
-              formatLog('ERROR', `关闭 HTTP 服务器时出错: ${err.message}`)
+              formatLog('ERROR', `Error closing HTTP server: ${err.message}`)
               reject(err)
             } else {
-              formatLog('INFO', '成功关闭 HTTP 服务器')
+              formatLog('INFO', 'HTTP server closed successfully.')
               this.httpServer = null
               resolve()
             }
@@ -313,10 +448,15 @@ export class McpRouterServer {
         })
       }
 
-      formatLog('INFO', '服务器已完全关闭')
+      formatLog('INFO', 'McpRouterServer shut down completely.')
     } catch (error) {
-      formatLog('ERROR', `关闭服务器时发生错误: ${error.message}`)
-      throw error // 重新抛出错误以通知调用者
+      formatLog(
+        'ERROR',
+        `Critical error during McpRouterServer shutdown: ${
+          (error as Error).message
+        }`
+      )
+      throw error
     }
   }
 }

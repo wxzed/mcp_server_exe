@@ -121,18 +121,15 @@ export class WebSocketServer {
           })
 
           // 创建路由服务器实例
-          this.routerServer = new McpRouterServer(this.serverInfo, {})
-
-          // 配置MCP服务器
-          if (this.configureMcp) {
-            this.configureMcp(this.routerServer.server)
-          }
-
+          this.routerServer = new McpRouterServer(this.serverInfo, {
+            transportType: 'stdio'
+          })
+ 
           // 导入MCP配置
-          await this.routerServer.importMcpConfig(this.mcpConfig)
+          await this.routerServer.importMcpConfig(this.mcpConfig, this.configureMcp)
 
           // 连接MCP服务器到传输层
-          await this.routerServer.server.connect(transport)
+          await this.routerServer.getActiveServer().connect(transport)
 
           this.logger.info('MCP服务器启动成功')
         } catch (error) {
