@@ -4,7 +4,7 @@ const log = async (sendNotification: any, level: string, data: string) => {
     params: {
       level,
       data,
-      id: new Date().getTime()
+      timestamp: new Date().getTime()
     }
   })
 }
@@ -12,7 +12,7 @@ const log = async (sendNotification: any, level: string, data: string) => {
 export const formatLog = async (
   level: 'INFO' | 'ERROR' | 'DEBUG',
   message: string,
-  sendNotification: any=null
+  sendNotification: any = null
 ): Promise<string> => {
   const timestamp = new Date().toISOString()
   let logMessage = `[${timestamp}] [${level}] [McpServerComposer] ${message}`
