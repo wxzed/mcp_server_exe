@@ -122,7 +122,7 @@ export class McpServerComposer {
       await targetClient.connect(transport)
     } catch (error) {
       if (retryCount >= 2) {
-        formatLog(
+        await formatLog(
           'ERROR',
           `Connection failed after 2 retries: ${
             config.type === 'sse' ? config.url : config.params.command
@@ -133,7 +133,7 @@ export class McpServerComposer {
         return
       }
 
-      formatLog(
+      await formatLog(
         'ERROR',
         `Connection failed: ${
           config.type === 'sse' ? config.url : config.params.command
@@ -150,7 +150,7 @@ export class McpServerComposer {
       })
     }
 
-    formatLog(
+    await formatLog(
       'INFO',
       `Successfully connected to server: ${
         config.type === 'sse' ? config.url : config.params.command
@@ -162,13 +162,13 @@ export class McpServerComposer {
     this.targetClients.set(name, { clientInfo, config })
 
     if (skipRegister) {
-      formatLog('INFO', `Skipping capability registration: ${name}`)
+      await formatLog('INFO', `Skipping capability registration: ${name}`)
       return
     }
 
     const capabilities = await targetClient.getServerCapabilities()
 
-    formatLog(
+    await formatLog(
       'INFO',
       `Starting server capability registration: ${name} ${JSON.stringify(
         capabilities,
@@ -188,12 +188,12 @@ export class McpServerComposer {
       try {
         this.composeTools(tools.tools, name)
 
-        formatLog(
+        await formatLog(
           'INFO',
           `Tool registration completed [${name}]: ${tools.tools.length} tools in total`
         )
       } catch (error) {
-        formatLog(
+        await formatLog(
           'ERROR',
           `Tool registration failed: ${name} ${JSON.stringify(error, null, 2)}`
         )
@@ -205,12 +205,12 @@ export class McpServerComposer {
         const resources = await targetClient.listResources()
         this.composeResources(resources.resources, name)
 
-        formatLog(
+        await formatLog(
           'INFO',
           `Resource registration completed [${name}]: ${resources.resources.length} resources in total`
         )
       } catch (error) {
-        formatLog(
+        await formatLog(
           'ERROR',
           `Resource registration failed: ${name} ${JSON.stringify(
             error,
@@ -226,12 +226,12 @@ export class McpServerComposer {
         const prompts = await targetClient.listPrompts()
         this.composePrompts(prompts.prompts, name)
 
-        formatLog(
+        await formatLog(
           'INFO',
           `Prompt registration completed [${name}]: ${prompts.prompts.length} prompts in total`
         )
       } catch (error) {
-        formatLog(
+        await formatLog(
           'ERROR',
           `Prompt registration failed: ${name} ${JSON.stringify(
             error,
@@ -242,7 +242,7 @@ export class McpServerComposer {
       }
     }
 
-    formatLog(
+    await formatLog(
       'INFO',
       `All capabilities registration completed for server ${name}`
     )
@@ -268,7 +268,7 @@ export class McpServerComposer {
             required: Object.keys(toolChain.steps[0].args)
           })
         : {},
-      async (args: any = {}) => {
+      async (args: any = {}, { sendNotification }) => {
         const results: any[] = []
         const clientsMap = new Map<string, Client>()
 
@@ -304,7 +304,11 @@ export class McpServerComposer {
               throw new Error(`Tool not found: ${step.toolName}`)
             }
 
-            formatLog('DEBUG', `Executing chain step ${i}: ${foundToolName}\n`)
+            await await formatLog(
+              'DEBUG',
+              `Executing chain step ${i}: ${foundToolName}\n`,
+              sendNotification
+            )
 
             if (step.outputMapping) {
               const sourceResult =
@@ -319,15 +323,17 @@ export class McpServerComposer {
                     if (value !== undefined) {
                       step.args[key] = value
                     } else {
-                      formatLog(
+                      await formatLog(
                         'INFO',
-                        `Output mapping path "${path}" returned undefined for step ${i}`
+                        `Output mapping path "${path}" returned undefined for step ${i}`,
+                        sendNotification
                       )
                     }
                   } catch (error) {
-                    formatLog(
+                    await formatLog(
                       'ERROR',
-                      `Failed to map output for step ${i}: ${error.message}`
+                      `Failed to map output for step ${i}: ${error.message}`,
+                      sendNotification
                     )
                   }
                 }
@@ -376,9 +382,10 @@ export class McpServerComposer {
               // 确保结果不是undefined
               results.push(result || { content: [{ type: 'text', text: '' }] })
             } catch (error) {
-              formatLog(
+              await formatLog(
                 'ERROR',
-                `Step ${i} (${foundToolName}) execution failed: ${error.message}`
+                `Step ${i} (${foundToolName}) execution failed: ${error.message}`,
+                sendNotification
               )
               // 在错误时添加一个空结果
               results.push({
@@ -387,7 +394,7 @@ export class McpServerComposer {
             }
           }
 
-          formatLog('DEBUG', `Chain execution completed`)
+          await formatLog('DEBUG', `Chain execution completed`, sendNotification)
 
           // 处理输出结果时添加安全检查
           let outputResults: any[] = []
@@ -409,9 +416,10 @@ export class McpServerComposer {
               outputResults = results.filter(result => result !== undefined)
             }
           } catch (error) {
-            formatLog(
+            await formatLog(
               'ERROR',
-              `Failed to process output results: ${error.message}`
+              `Failed to process output results: ${error.message}`,
+              sendNotification
             )
             outputResults = []
           }
@@ -528,7 +536,10 @@ export class McpServerComposer {
                 }
               }
 
-              formatLog('DEBUG', `Calling tool: ${tool.name} from ${name}\n`)
+              await formatLog(
+                'DEBUG',
+                `Calling tool: ${tool.name} from ${name}\n`
+              )
 
               try {
                 const result = await toolClient.callTool({
@@ -544,7 +555,7 @@ export class McpServerComposer {
                 try {
                   await toolClient.close()
                 } catch (closeError) {
-                  formatLog(
+                  await formatLog(
                     'ERROR',
                     `Failed to close client connection: ${closeError.message}`
                   )
@@ -749,7 +760,7 @@ export class McpServerComposer {
       }
       return tools
     } catch (error) {
-      formatLog('ERROR', `列出工具失败: ${error.message}`)
+        formatLog('ERROR', `列出工具失败: ${error.message}`)
       return []
     }
   }
@@ -768,7 +779,7 @@ export class McpServerComposer {
       }
 
       const { tool, fullName } = toolInfo
-      formatLog('DEBUG', `正在调用工具: ${fullName}`)
+      await formatLog('DEBUG', `正在调用工具: ${fullName}`)
 
       if (tool.needsClient) {
         // 查找支持该工具的客户端
@@ -804,7 +815,7 @@ export class McpServerComposer {
         return await tool.callback(args)
       }
     } catch (error) {
-      formatLog('ERROR', `工具调用失败: ${error.message}`)
+      await formatLog('ERROR', `工具调用失败: ${error.message}`)
       throw error
     }
   }

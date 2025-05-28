@@ -92,7 +92,9 @@ for (let i = 0; i < args.length; i++) {
     continue
   }
   if (args[i] === '--help' || args[i] === '-h') {
-    formatLog('INFO', `
+    formatLog(
+      'INFO',
+      `
 使用方法: node server.js [选项]
 
 必需参数:
@@ -115,7 +117,8 @@ for (let i = 0; i < args.length; i++) {
 示例:
   node server.js --ws ws://localhost:8080
   node server.js --port 3000 --transport sse
-    `)
+    `
+    )
     process.exit(0)
   }
 }
@@ -138,7 +141,10 @@ const loadConfig = (config: any) => {
       const text = fs.readFileSync(config.mcpConfig, 'utf8')
       mcpJSON = JSON.parse(text)
     } else {
-      formatLog('INFO', `配置文件 ${config.mcpConfig} 在加载时未找到，将使用空配置。`)
+      formatLog(
+        'INFO',
+        `配置文件 ${config.mcpConfig} 在加载时未找到，将使用空配置。`
+      )
       mcpJSON = {}
     }
 
@@ -172,7 +178,10 @@ const loadCustomConfig = () => {
       delete require.cache[require.resolve(customConfigFullPath)]
       const customModule = require(customConfigFullPath)
 
-      if (customModule.configureMcp && typeof customModule.configureMcp === 'function') {
+      if (
+        customModule.configureMcp &&
+        typeof customModule.configureMcp === 'function'
+      ) {
         formatLog('INFO', '发现 configureMcp 函数，将用于配置 MCP 服务器')
         configureMcp = customModule.configureMcp
         return true
@@ -196,7 +205,10 @@ async function startServer () {
       if (typeof (currentServer as any).close === 'function') {
         await (currentServer as any).close()
       } else {
-        formatLog('INFO', '当前服务实例没有可识别的 stop 或 close 方法。可能无法完全停止旧实例。')
+        formatLog(
+          'INFO',
+          '当前服务实例没有可识别的 stop 或 close 方法。可能无法完全停止旧实例。'
+        )
       }
       formatLog('INFO', '旧服务实例已处理停止请求。')
     } catch (stopError) {
@@ -232,11 +244,7 @@ async function startServer () {
       })
       currentServer = routerServer // 将新实例赋值给 currentServer
 
-      if (typeof configureMcp === 'function') {
-        configureMcp(routerServer.server, ResourceTemplate, z)
-      }
-
-      await routerServer.importMcpConfig(mcpJSON) // 使用更新后的全局 mcpJSON
+      await routerServer.importMcpConfig(mcpJSON, configureMcp) // 使用更新后的全局 mcpJSON
       routerServer.start()
     }
     formatLog('INFO', '服务已成功启动或重启。')
@@ -270,13 +278,19 @@ function debounceRestart (delay: number) {
       // 调用 startServer 以重启服务
       startServer()
     } catch (reloadError) {
-      formatLog('ERROR', `重新加载配置或重启服务时发生错误: ${reloadError.message}`)
+      formatLog(
+        'ERROR',
+        `重新加载配置或重启服务时发生错误: ${reloadError.message}`
+      )
     }
   }, delay)
 }
 
 if (config.mcpConfig && fs.existsSync(config.mcpConfig)) {
-  formatLog('INFO', `正在监听配置文件: ${config.mcpConfig} 的变化以进行自动重启...`)
+  formatLog(
+    'INFO',
+    `正在监听配置文件: ${config.mcpConfig} 的变化以进行自动重启...`
+  )
   fs.watchFile(config.mcpConfig, { interval: 1000 }, (curr, prev) => {
     // fs.watchFile 检查文件的修改时间 (mtime)
     if (curr.mtime !== prev.mtime) {
@@ -285,13 +299,19 @@ if (config.mcpConfig && fs.existsSync(config.mcpConfig)) {
     }
   })
 } else if (config.mcpConfig) {
-  formatLog('INFO', `指定的 MCP JSON 配置文件 ${config.mcpConfig} 不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`)
+  formatLog(
+    'INFO',
+    `指定的 MCP JSON 配置文件 ${config.mcpConfig} 不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`
+  )
 }
 
 // 监听自定义配置文件（--mcp-js）的变化
 if (customConfigPath && fs.existsSync(customConfigPath)) {
   const customConfigFullPath = path.resolve(process.cwd(), customConfigPath)
-  formatLog('INFO', `正在监听自定义配置文件: ${customConfigFullPath} 的变化以进行自动重启...`)
+  formatLog(
+    'INFO',
+    `正在监听自定义配置文件: ${customConfigFullPath} 的变化以进行自动重启...`
+  )
   fs.watchFile(customConfigFullPath, { interval: 1000 }, (curr, prev) => {
     if (curr.mtime !== prev.mtime) {
       formatLog('INFO', `检测到自定义配置文件 ${customConfigFullPath} 已修改。`)
@@ -299,7 +319,10 @@ if (customConfigPath && fs.existsSync(customConfigPath)) {
     }
   })
 } else if (customConfigPath) {
-  formatLog('INFO', `指定的自定义配置文件 ${customConfigPath} 不存在，无法监听其变化。`)
+  formatLog(
+    'INFO',
+    `指定的自定义配置文件 ${customConfigPath} 不存在，无法监听其变化。`
+  )
 }
 // --- 文件监听逻辑结束 ---
 
