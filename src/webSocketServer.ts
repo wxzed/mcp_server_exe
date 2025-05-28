@@ -11,6 +11,9 @@ export class WebSocketServer {
   private backoff = INITIAL_BACKOFF
   private routerServer: McpRouterServer | null = null
   private logger: any
+  private isRunning = false
+  private currentWs: WebSocket | null = null
+  private currentTransport: WebSocketServerTransport | null = null
 
   constructor (
     private uri: string,
@@ -36,7 +39,8 @@ export class WebSocketServer {
   }
 
   public async start (): Promise<void> {
-    while (true) {
+    this.isRunning = true
+    while (this.isRunning) {
       try {
         if (this.reconnectAttempt > 0) {
           const waitTime = this.backoff * (1 + Math.random() * 0.1)
@@ -50,6 +54,10 @@ export class WebSocketServer {
 
         await this.connect()
       } catch (e) {
+        if (!this.isRunning) {
+          // 如果服务器正在关闭，不要继续重连
+          break
+        }
         this.reconnectAttempt++
         this.logger.warning(
           `连接关闭 (尝试次数: ${this.reconnectAttempt}): ${e}`
@@ -63,6 +71,7 @@ export class WebSocketServer {
     return new Promise((resolve, reject) => {
       this.logger.info('正在连接到WebSocket服务器...')
       const ws = new WebSocket(this.uri)
+      this.currentWs = ws
 
       ws.on('open', async () => {
         this.logger.info('成功连接到WebSocket服务器')
@@ -76,6 +85,7 @@ export class WebSocketServer {
 
           // 创建WebSocket传输层
           const transport = new WebSocketServerTransport(ws)
+          this.currentTransport = transport
 
           // 设置消息处理
           ws.on('message', (data: WebSocket.Data) => {
@@ -148,5 +158,51 @@ export class WebSocketServer {
         reject(error)
       })
     })
+  }
+
+  /**
+   * 关闭WebSocket服务器及其所有相关资源
+   * @returns Promise<void>
+   */
+  public async close(): Promise<void> {
+    try {
+      this.logger.info('正在关闭WebSocket服务器...')
+      
+      // 1. 停止重连循环
+      this.isRunning = false
+      
+      // 2. 关闭当前的WebSocket连接
+      if (this.currentWs) {
+        if (this.currentWs.readyState === WebSocket.OPEN) {
+          await new Promise<void>((resolve) => {
+            this.currentWs!.close()
+            this.currentWs!.on('close', () => {
+              this.logger.info('WebSocket连接已关闭')
+              resolve()
+            })
+          })
+        }
+        this.currentWs = null
+      }
+
+      // 3. 清理传输层资源
+      if (this.currentTransport) {
+        if (typeof this.currentTransport.close === 'function') {
+          await this.currentTransport.close()
+        }
+        this.currentTransport = null
+      }
+
+      // 4. 关闭MCP路由服务器
+      if (this.routerServer) {
+        await this.routerServer.close()
+        this.routerServer = null
+      }
+
+      this.logger.info('WebSocket服务器已完全关闭')
+    } catch (error) {
+      this.logger.error(`关闭WebSocket服务器时发生错误: ${error}`)
+      throw error
+    }
   }
 }

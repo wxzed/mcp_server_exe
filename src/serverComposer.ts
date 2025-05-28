@@ -62,6 +62,7 @@ interface ToolChain {
 export class McpServerComposer {
   public readonly server: McpServer
   public namespace: string = NAMESPACE_SEPARATOR
+
   private readonly targetClients: Map<
     string,
     {
@@ -72,7 +73,37 @@ export class McpServerComposer {
   private readonly clientTools: Map<string, Set<string>> = new Map()
 
   constructor (serverInfo: Implementation) {
-    this.server = new McpServer(serverInfo)
+    this.server = new McpServer(serverInfo, {
+      capabilities: {
+        logging: {}, // 启用日志能力
+        resources: {
+          // 其他能力也可以一起设置
+          listChanged: true
+        },
+        tools: {
+          listChanged: true
+        },
+        prompts: {
+          listChanged: true
+        }
+      }
+    })
+
+    // 确保 _registeredTools 被初始化
+    // @ts-ignore
+    if (!this.server._registeredTools) {
+      // @ts-ignore
+      this.server._registeredTools = {}
+    }
+
+    // 绑定工具方法
+    // @ts-ignore
+    this.server._exe_tools = {
+      callTool: (toolName: string, args: any) => this.callTool(toolName, args),
+      hasToolAvailable: (toolName: string) => this.hasToolAvailable(toolName),
+      listTools: () => this.listTools(),
+      findTool: (toolName: string) => this.findTool(toolName)
+    }
   }
 
   async add (
@@ -667,5 +698,128 @@ export class McpServerComposer {
     if (client) {
       this.targetClients.delete(clientName)
     }
+  }
+
+  /**
+   * 查找已注册的工具
+   */
+  public findTool (toolName: string): {
+    tool: any
+    fullName: string
+  } | null {
+    try {
+      const tools = this.getRegisteredTools()
+      for (const [name, tool] of Object.entries(tools)) {
+        if (
+          name === toolName ||
+          name.endsWith(`${this.namespace}${toolName}`)
+        ) {
+          return { tool, fullName: name }
+        }
+      }
+      return null
+    } catch (error) {
+      formatLog('ERROR', `查找工具失败: ${error.message}`)
+      return null
+    }
+  }
+
+  /**
+   * 列出所有已注册的工具
+   */
+  public listTools (): Array<{
+    name: string
+    description: string
+    needsClient: boolean
+  }> {
+    try {
+      const tools = []
+      // @ts-ignore
+      for (const [name, tool] of Object.entries(this.server._registeredTools)) {
+        if (tool) {
+          // 添加工具对象存在性检查
+          tools.push({
+            name,
+            // @ts-ignore
+            description: tool.description || '',
+            // @ts-ignore
+            needsClient: tool.needsClient || false
+          })
+        }
+      }
+      return tools
+    } catch (error) {
+      formatLog('ERROR', `列出工具失败: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * 调用工具
+   * @param toolName 工具名称
+   * @param args 工具参数
+   * @returns 工具执行结果
+   */
+  public async callTool (toolName: string, args: any = {}): Promise<any> {
+    try {
+      const toolInfo = this.findTool(toolName)
+      if (!toolInfo) {
+        throw new Error(`工具未找到: ${toolName}`)
+      }
+
+      const { tool, fullName } = toolInfo
+      formatLog('DEBUG', `正在调用工具: ${fullName}`)
+
+      if (tool.needsClient) {
+        // 查找支持该工具的客户端
+        let foundClientName: string | undefined
+        for (const [clientName, _] of this.targetClients.entries()) {
+          const supportedTools = this.clientTools.get(clientName)
+          if (supportedTools?.has(fullName)) {
+            foundClientName = clientName
+            break
+          }
+        }
+
+        if (!foundClientName) {
+          throw new Error(`未找到支持该工具的客户端: ${fullName}`)
+        }
+
+        // 创建客户端连接
+        const clientItem = this.targetClients.get(foundClientName)
+        if (!clientItem) {
+          throw new Error(`客户端配置未找到: ${foundClientName}`)
+        }
+
+        const client = new Client(clientItem.clientInfo)
+        try {
+          await client.connect(this.createTransport(clientItem.config))
+          const result = await tool.chainExecutor(args, client)
+          return result
+        } finally {
+          await client.close()
+        }
+      } else {
+        // 本地工具直接调用
+        return await tool.callback(args)
+      }
+    } catch (error) {
+      formatLog('ERROR', `工具调用失败: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * 检查工具是否存在
+   * @param toolName 工具名称
+   * @returns 是否存在
+   */
+  public hasToolAvailable (toolName: string): boolean {
+    return this.findTool(toolName) !== null
+  }
+
+  private getRegisteredTools () {
+    // @ts-ignore
+    return this.server._registeredTools || {} // 假设 McpServer 有 _registeredTools
   }
 }

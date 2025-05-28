@@ -1,4 +1,4 @@
-import type { Implementation } from '@modelcontextprotocol/sdk/types.js'
+import type { Implementation  } from '@modelcontextprotocol/sdk/types.js'
 import { McpServerComposer } from './serverComposer'
 import { ExpressSSEServerTransport } from './expressSseTransport'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -8,6 +8,7 @@ import cors from 'cors'
 import type { Express } from 'express'
 import { formatLog } from './utils/console'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
+import type { Server } from 'http'
 
 const NAMESPACE_SEPARATOR = '.'
 
@@ -18,8 +19,10 @@ export class McpRouterServer {
     ExpressSSEServerTransport | StdioServerTransport
   > = {}
   private app: Express
+  private httpServer: Server | null = null
   private readonly transportType: 'sse' | 'stdio'
   public readonly server: McpServer
+
   constructor (
     serverInfo: Implementation,
     private readonly serverOptions: {
@@ -51,8 +54,15 @@ export class McpRouterServer {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
       credentials: true, // Allow credentials
-      maxAge: 86400 // Preflight request cache time (seconds)
+      maxAge: 186400 // Preflight request cache time (seconds)
     }
+
+    // 设置请求超时时间为30秒
+    this.app.use((req, res, next) => {
+      req.setTimeout(240000); // 240秒
+      res.setTimeout(240000); // 240秒
+      next();
+    });
 
     // Enable CORS
     this.app.use(cors(corsOptions))
@@ -117,9 +127,9 @@ export class McpRouterServer {
     })
 
     // API endpoint
-    this.app.get('/api/list-mcp-servers', (_, res) => {
-      res.json(this.serverComposer.listTargetClients())
-    })
+    // this.app.get('/api/list-mcp-servers', (_, res) => {
+    //   res.json(this.serverComposer.listTargetClients())
+    // })
 
     // 404 handler
     this.app.use((_, res) => {
@@ -231,7 +241,7 @@ export class McpRouterServer {
     const port = this.serverOptions.port ?? 3003
     const host = this.serverOptions.host ?? '0.0.0.0'
 
-    this.app.listen(port, host, () => {
+    this.httpServer = this.app.listen(port, host, () => {
       let mcpConfig = { mcpServers: {} }
       // @ts-ignore
       const serverInfo = this.serverComposer.server.server._serverInfo
@@ -244,8 +254,69 @@ export class McpRouterServer {
         'INFO',
         `\n\nMCP Server Config: ${JSON.stringify(mcpConfig, null, 2)}\n\n`
       )
-      // formatLog('INFO',`\nMCP服务器(streamable)运行在端口 ${port}/mcp`);
       formatLog('INFO', `\n\nMCP Server(sse) running on port ${port}\n\n`)
     })
+  }
+
+  /**
+   * 关闭服务器及其所有连接
+   * @returns Promise<void> 当所有资源都已清理完毕时解决
+   */
+  async close (): Promise<void> {
+    try {
+      // 断开所有连接
+      this.serverComposer.disconnectAll()
+
+      // 1. 关闭所有活跃的传输连接
+      const closePromises = Object.entries(this.transports).map(
+        async ([sessionId, transport]) => {
+          try {
+            formatLog('INFO', `正在关闭会话 ${sessionId}...`)
+            if (transport instanceof ExpressSSEServerTransport) {
+              // 如果传输有自己的关闭方法，调用它
+              if (typeof transport.close === 'function') {
+                await transport.close()
+              }
+              // 调用 onclose 回调（如果存在）
+              if (transport.onclose) {
+                transport.onclose()
+              }
+            } else if (transport instanceof StdioServerTransport) {
+              // 关闭 stdio 传输
+              if (typeof transport.close === 'function') {
+                await transport.close()
+              }
+            }
+            delete this.transports[sessionId]
+          } catch (error) {
+            formatLog('ERROR', `关闭会话 ${sessionId} 时出错: ${error.message}`)
+          }
+        }
+      )
+
+      // 等待所有传输连接关闭
+      await Promise.all(closePromises)
+
+      // 2. 关闭 HTTP 服务器（如果在 SSE 模式下）
+      if (this.httpServer) {
+        await new Promise<void>((resolve, reject) => {
+          this.httpServer!.close(err => {
+            if (err) {
+              formatLog('ERROR', `关闭 HTTP 服务器时出错: ${err.message}`)
+              reject(err)
+            } else {
+              formatLog('INFO', '成功关闭 HTTP 服务器')
+              this.httpServer = null
+              resolve()
+            }
+          })
+        })
+      }
+
+      formatLog('INFO', '服务器已完全关闭')
+    } catch (error) {
+      formatLog('ERROR', `关闭服务器时发生错误: ${error.message}`)
+      throw error // 重新抛出错误以通知调用者
+    }
   }
 }
