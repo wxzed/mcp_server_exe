@@ -93,8 +93,8 @@ export class McpRouterServer {
     }
 
     this.app.use((req, res, next) => {
-      req.setTimeout(240000)
-      res.setTimeout(240000)
+      req.setTimeout(240000*10)
+      res.setTimeout(240000*10)
       next()
     })
 
