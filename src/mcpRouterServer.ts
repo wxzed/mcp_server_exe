@@ -59,7 +59,12 @@ export class McpRouterServer {
     if (this.transportType === 'sse') {
       this.defaultSseComposer = new McpServerComposer(this.baseServerInfo)
       this.defaultSseServer = this.defaultSseComposer.server
+    }else if(this.transportType === 'stdio'){
+      this.stdioComposer = new McpServerComposer(this.baseServerInfo)
+      this.stdioServer = this.stdioComposer.server
+      this.stdioTransport = new StdioServerTransport()
     }
+
   }
 
   private async setupRoutes () {
@@ -93,8 +98,8 @@ export class McpRouterServer {
     }
 
     this.app.use((req, res, next) => {
-      req.setTimeout(240000)
-      res.setTimeout(240000)
+      req.setTimeout(240000*10)
+      res.setTimeout(240000*10)
       next()
     })
 
