@@ -221,7 +221,7 @@ async function startServer () {
   try {
     if (cliArgs.ws) {
       // WebSocket模式
-      formatLog('INFO', `使用WebSocket模式，连接到: ${cliArgs.ws}`)
+      formatLog('INFO', `使用WebSocket模式，连接到: ${cliArgs.ws.slice(0,20)}...`)
       const wsServer = new WebSocketServer(
         cliArgs.ws,
         serverInfo, // 使用更新后的全局 serverInfo
