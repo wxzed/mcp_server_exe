@@ -73,6 +73,13 @@ export class McpServerComposer {
   private readonly clientTools: Map<string, Set<string>> = new Map()
 
   constructor (serverInfo: Implementation) {
+    // console.log('serverInfo::: ', serverInfo)
+
+    serverInfo.name =
+      serverInfo.name || (serverInfo.serverName as string) || 'MCPSERVER.exe';
+    serverInfo.version =
+      serverInfo.version || (serverInfo.serverVersion as string) || '1.0.0'
+
     this.server = new McpServer(serverInfo, {
       capabilities: {
         logging: {}, // 启用日志能力
@@ -394,7 +401,11 @@ export class McpServerComposer {
             }
           }
 
-          await formatLog('DEBUG', `Chain execution completed`, sendNotification)
+          await formatLog(
+            'DEBUG',
+            `Chain execution completed`,
+            sendNotification
+          )
 
           // 处理输出结果时添加安全检查
           let outputResults: any[] = []
@@ -760,7 +771,7 @@ export class McpServerComposer {
       }
       return tools
     } catch (error) {
-        formatLog('ERROR', `列出工具失败: ${error.message}`)
+      formatLog('ERROR', `列出工具失败: ${error.message}`)
       return []
     }
   }
