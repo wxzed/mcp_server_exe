@@ -1,12 +1,12 @@
 {
     "name": "mcp_server_exe",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
     "scripts": {
         "build": "tsc",
         "start": "node dist/server.js --port 3002 --mcp-config ./examples/mcp.json",
-        "dev": "tsx src/server.ts --port 3002 --mcp-config ./examples/tools-chain/mcp-tools.json",
+        "dev": "tsx src/server.ts --port 3002 --mcp-config ./examples/mcp-sse.json",
         "package-mac-intel": "pkg . --targets node18-macos-x64 --output executables/mcp_server-macos-x64",
         "package-mac-arm": "pkg . --targets node18-macos-arm64 --output executables/mcp_server-macos-arm64",
         "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server-win-x64.exe",
@@ -40,7 +40,7 @@
     },
     "homepage": "https://github.com/shadowcz007/mcp_server.exe#readme",
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.11.3",
+        "@modelcontextprotocol/sdk": "^1.12.1",
         "@types/cors": "^2.8.18",
         "@types/uuid": "^10.0.0",
         "@types/ws": "^8.18.1",
