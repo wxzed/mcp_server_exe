@@ -64,6 +64,8 @@ WebSocket 模式特性 | WebSocket Mode Features:
 - 多服务统一管理 | Unified management of multiple services
 - 兼容标准 MCP 协议 | Compatible with standard MCP protocol
 
+相关项目[可视化xiaozhi-mcp启动器](https://github.com/shadowcz007/xiaozhi-mcp-client)
+
 ### 2. 快速启动独立服务 | Quick Start Standalone Service
 
 最简单的使用方式 - 双击运行，即可启动一个标准的 MCP 服务。
