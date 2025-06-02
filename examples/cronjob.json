@@ -2,10 +2,7 @@
     "tasks": [
         {
             "schedule": "*/30 * * * * *",
-            "operations": [
-                {
-                    "type": "listTools"
-                },
+            "operations": [ 
                 {
                     "type": "callTool",
                     "name": "get_product_hunt_url",
@@ -16,7 +13,8 @@
             "notify": [
                 {
                     "type": "desktop",
-                    "title": "任务执行结果"
+                    "title": "任务执行结果",
+                    "icon": ""
                 }
             ]
         }
