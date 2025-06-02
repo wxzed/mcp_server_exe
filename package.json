@@ -1,6 +1,6 @@
 {
     "name": "mcp_server_exe",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
     "scripts": {
@@ -12,7 +12,8 @@
         "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server-win-x64.exe",
         "start-with-config": "node dist/server.js --mcp-js ./examples/test-config.js",
         "test-custom-config": "node scripts/test-custom-config.js",
-        "test-packaged-app": "node scripts/test-packaged-app.js"
+        "test-packaged-app": "node scripts/test-packaged-app.js",
+        "dev-ws": "tsx src/server.ts --mcp-config mcp-test.json --ws wss://api.xiaozhi.me/mcp/?token=xx"
     },
     "bin": "dist/server.js",
     "pkg": {
