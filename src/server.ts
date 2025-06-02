@@ -103,7 +103,7 @@ for (let i = 0; i < args.length; i++) {
 可选参数:
   --ws <url>             WebSocket 服务器地址（如果指定，将使用WebSocket模式）
   --mcp-js <path>        MCP JavaScript 配置文件路径
-  --mcp-config <path>    MCP JSON 配置文件路径
+  --mcp-config <path/json>    MCP JSON 配置文件路径/json字符串
   --server-name <name>   服务器名称
   --port <port>          端口号
   --version <version>    版本号
@@ -135,11 +135,25 @@ const config = loadServerConfig({}, cliArgs)
 const loadConfig = (config: any) => {
   let mcpJSON: any = {},
     serverInfo: any = {}
+
+  const checkJSON = (str: string) => {
+    try {
+      let d = JSON.parse(str)
+      if (d.mcpServers && Object.keys(d.mcpServers).length > 0) {
+        return true
+      }
+    } catch (error) {
+      return false
+    }
+  }
+
   try {
     // 1. 重新加载 MCP JSON 配置文件
     if (config?.mcpConfig && fs.existsSync(config.mcpConfig)) {
       const text = fs.readFileSync(config.mcpConfig, 'utf8')
       mcpJSON = JSON.parse(text)
+    } else if (config?.mcpConfig && checkJSON(config.mcpConfig)) {
+      mcpJSON = JSON.parse(config.mcpConfig)
     } else {
       formatLog(
         'INFO',
@@ -221,7 +235,10 @@ async function startServer () {
   try {
     if (cliArgs.ws) {
       // WebSocket模式
-      formatLog('INFO', `使用WebSocket模式，连接到: ${cliArgs.ws.slice(0,20)}...`)
+      formatLog(
+        'INFO',
+        `使用WebSocket模式，连接到: ${cliArgs.ws.slice(0, 20)}...`
+      )
       const wsServer = new WebSocketServer(
         cliArgs.ws,
         serverInfo, // 使用更新后的全局 serverInfo
@@ -301,7 +318,7 @@ if (config.mcpConfig && fs.existsSync(config.mcpConfig)) {
 } else if (config.mcpConfig) {
   formatLog(
     'INFO',
-    `指定的 MCP JSON 配置文件 ${config.mcpConfig} 不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`
+    `指定的 MCP JSON 配置文件不存在，无法监听其变化。服务将以无 MCP JSON 配置或默认配置启动。`
   )
 }
 

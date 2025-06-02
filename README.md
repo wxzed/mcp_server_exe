@@ -224,7 +224,13 @@ mcpServer.stdin.write(JSON.stringify({
 
 The server supports the following command line arguments to customize its behavior:
 
-| 参数 | 说明 | 默认值 ||------|------|--------|| `--ws <url>` | WebSocket 服务器地址，启用 WebSocket 连接模式 | 无 || `--mcp-js <路径>` | 配置文件路径（包含服务器配置和 MCP 配置） | 内置配置 || `--port <端口>` | 服务器监听端口 | 3000 || `--mcp-config <路径>` | MCP 配置文件路径，用于组合多个 MCP 服务 | 无 || `--transport <模式>` | 传输模式，支持 'sse' 或 'stdio' | sse |
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--ws <url>` | WebSocket 服务器地址，启用 WebSocket 连接模式 | 无 |
+| `--mcp-js <路径>` | 配置文件路径（包含服务器配置和 MCP 配置） | 内置配置 |
+| `--port <端口>` | 服务器监听端口 | 3000 |
+| `--mcp-config <路径/json字符串>` | MCP 配置文件路径/json字符串，用于组合多个 MCP 服务 | 无 |
+| `--transport <模式>` | 传输模式，支持 'sse' 或 'stdio' | sse |
 
 ### 配置文件格式 | Configuration File Format
 

@@ -14,8 +14,10 @@ export const formatLog = async (
   message: string,
   sendNotification: any = null
 ): Promise<string> => {
-  const timestamp = new Date().toISOString()
-  let logMessage = `[${timestamp}] [${level}] [McpServerComposer] ${message}`
+  const timestamp = new Date().toISOString();
+  //去除换行
+  const messageNew = message.replace(/\n/g, ' ');
+  let logMessage = `[${timestamp}] [${level}] [McpServerComposer] ${messageNew}`
   if (level === 'ERROR') {
     console.error(logMessage)
   } else if (level === 'DEBUG') {
@@ -25,7 +27,7 @@ export const formatLog = async (
   }
 
   if (sendNotification) {
-    await log(sendNotification, level, message)
+    await log(sendNotification, level, messageNew)
   }
 
   return logMessage
