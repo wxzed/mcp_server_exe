@@ -3,7 +3,9 @@ const path = require('path')
 const { loadServerConfig } = require('./tools/serverConfig.js')
 const { McpRouterServer } = require('./mcpRouterServer')
 const { WebSocketServer } = require('./webSocketServer')
+const { cronjob } = require('./cronjob/index')
 import { formatLog } from './utils/console'
+
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
@@ -26,6 +28,7 @@ interface CliArgs {
   transport?: string
   mcpConfig?: string
   ws?: string // 新增WebSocket URL参数
+  cronjob?: string // 新增cronjob参数
 }
 
 // 创建 cliArgs 对象
@@ -36,6 +39,13 @@ for (let i = 0; i < args.length; i++) {
   // WebSocket URL参数
   if (args[i] === '--ws' && i + 1 < args.length) {
     cliArgs.ws = args[i + 1]
+    i++
+    continue
+  }
+
+  // cronjob参数
+  if (args[i] === '--cronjob' && i + 1 < args.length) {
+    cliArgs.cronjob = args[i + 1]
     i++
     continue
   }
@@ -251,6 +261,28 @@ async function startServer () {
       )
       currentServer = wsServer // 将新实例赋值给 currentServer
       await wsServer.start()
+    } else if (cliArgs.cronjob) {
+      //解析
+      cronjob(cliArgs.cronjob)
+
+      // 创建一个mcprouterserver的stdio模式
+      const routerServer = new McpRouterServer(serverInfo, {
+        // 使用更新后的全局 serverInfo
+        port: config.port,
+        host: config.host ?? '0.0.0.0',
+        transportType: config.transport as 'sse' | 'stdio'
+      })
+      currentServer = routerServer // 将新实例赋值给 currentServer
+      await routerServer.importMcpConfig(mcpJSON, configureMcp) // 使用更新后的全局 mcpJSON
+      routerServer.start()
+
+      // corojob 里的client接上 routerServer 
+      const client = new Client({
+        name: 'cron-job-client',
+        version: '1.0.0'
+      })
+      await client.connect(routerServer.transport)
+
     } else {
       // 常规模式
       const routerServer = new McpRouterServer(serverInfo, {
