@@ -2,15 +2,6 @@
     "tasks": [
         {
             "schedule": "*/30 * * * * *",
-            "transport": {
-                "command": "C:\\Users\\38957\\Documents\\GitHub\\mcp_server_exe\\executables\\mcp_server-win-x64.exe",
-                "args": [
-                    "--transport",
-                    "stdio",
-                    "--mcp-js",
-                    "C:\\Users\\38957\\Documents\\GitHub\\mcp_server_exe\\examples\\product-hunt\\custom-mcp-config.js"
-                ]
-            },
             "operations": [
                 {
                     "type": "listTools"

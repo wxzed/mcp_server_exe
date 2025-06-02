@@ -4,8 +4,7 @@ const { loadServerConfig } = require('./tools/serverConfig.js')
 const { McpRouterServer } = require('./mcpRouterServer')
 const { WebSocketServer } = require('./webSocketServer')
 const { cronjob } = require('./cronjob/index')
-import { formatLog } from './utils/console'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { formatLog } from './utils/console' 
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
@@ -273,11 +272,7 @@ async function startServer () {
       // 导入配置并启动服务器
       await routerServer.importMcpConfig(mcpJSON, configureMcp)
       await routerServer.start()
-
-      console.log(currentServer.getActiveServer()._client)
-
-      // 启动定时任务
-      formatLog('INFO', '正在启动定时任务...')
+  
       cronjob(cliArgs.cronjob, currentServer.getActiveServer()._client)
 
       formatLog('INFO', '定时任务服务器已启动')
