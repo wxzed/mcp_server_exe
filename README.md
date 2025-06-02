@@ -191,7 +191,11 @@ module.exports = {
 }
 ```
 
-### 6. 嵌入式集成 | Embedded Integration
+### 6. 定时任务模式 (文档待补充)
+--cronjob 定时执行tool
+
+
+### 7. 嵌入式集成 | Embedded Integration
 
 作为独立进程集成到任何应用程序中。
 
