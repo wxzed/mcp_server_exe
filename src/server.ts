@@ -5,7 +5,7 @@ const { McpRouterServer } = require('./mcpRouterServer')
 const { WebSocketServer } = require('./webSocketServer')
 const { cronjob } = require('./cronjob/index')
 import { formatLog } from './utils/console'
-
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
@@ -262,27 +262,25 @@ async function startServer () {
       currentServer = wsServer // 将新实例赋值给 currentServer
       await wsServer.start()
     } else if (cliArgs.cronjob) {
-      //解析
-      cronjob(cliArgs.cronjob)
-
       // 创建一个mcprouterserver的stdio模式
       const routerServer = new McpRouterServer(serverInfo, {
-        // 使用更新后的全局 serverInfo
         port: config.port,
         host: config.host ?? '0.0.0.0',
-        transportType: config.transport as 'sse' | 'stdio'
+        transportType: 'stdio' // 强制使用stdio模式
       })
-      currentServer = routerServer // 将新实例赋值给 currentServer
-      await routerServer.importMcpConfig(mcpJSON, configureMcp) // 使用更新后的全局 mcpJSON
-      routerServer.start()
+      currentServer = routerServer
 
-      // corojob 里的client接上 routerServer 
-      const client = new Client({
-        name: 'cron-job-client',
-        version: '1.0.0'
-      })
-      await client.connect(routerServer.transport)
+      // 导入配置并启动服务器
+      await routerServer.importMcpConfig(mcpJSON, configureMcp)
+      await routerServer.start()
 
+      console.log(currentServer.getActiveServer()._client)
+
+      // 启动定时任务
+      formatLog('INFO', '正在启动定时任务...')
+      cronjob(cliArgs.cronjob, currentServer.getActiveServer()._client)
+
+      formatLog('INFO', '定时任务服务器已启动')
     } else {
       // 常规模式
       const routerServer = new McpRouterServer(serverInfo, {

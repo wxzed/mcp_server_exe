@@ -76,7 +76,7 @@ export class McpServerComposer {
     // console.log('serverInfo::: ', serverInfo)
 
     serverInfo.name =
-      serverInfo.name || (serverInfo.serverName as string) || 'MCPSERVER.exe';
+      serverInfo.name || (serverInfo.serverName as string) || 'MCPSERVER.exe'
     serverInfo.version =
       serverInfo.version || (serverInfo.serverVersion as string) || '1.0.0'
 
@@ -105,11 +105,16 @@ export class McpServerComposer {
 
     // 绑定工具方法
     // @ts-ignore
-    this.server._exe_tools = {
+    this.server._client = {
       callTool: (toolName: string, args: any) => this.callTool(toolName, args),
       hasToolAvailable: (toolName: string) => this.hasToolAvailable(toolName),
       listTools: () => this.listTools(),
-      findTool: (toolName: string) => this.findTool(toolName)
+      findTool: (toolName: string) => this.findTool(toolName),
+      listPrompts: () => this.listPrompts(),
+      getPrompt: (promptName: string, args: any) =>
+        this.getPrompt(promptName, args),
+      listResources: () => this.listResources(),
+      readResource: (resourceName: string) => this.readResource(resourceName)
     }
   }
 
@@ -725,10 +730,10 @@ export class McpServerComposer {
   /**
    * 查找已注册的工具
    */
-  public findTool (toolName: string): {
+  public async findTool (toolName: string): Promise<{
     tool: any
     fullName: string
-  } | null {
+  } | null> {
     try {
       const tools = this.getRegisteredTools()
       for (const [name, tool] of Object.entries(tools)) {
@@ -746,14 +751,34 @@ export class McpServerComposer {
     }
   }
 
+  public async getPrompt (promptName: string, args: any) {
+    // @ts-ignore
+    return this.server._registeredPrompts[promptName]
+  }
+
+  public async listPrompts () {
+    // @ts-ignore
+    return this.server._registeredPrompts
+  }
+
+  public async listResources () {
+    // @ts-ignore
+    return this.server._registeredResources
+  }
+
+  public async readResource (resourceName: string) {
+    // @ts-ignore
+    return this.server._registeredResources[resourceName]
+  }
+
   /**
    * 列出所有已注册的工具
    */
-  public listTools (): Array<{
+  public async listTools (): Promise<Array<{
     name: string
     description: string
     needsClient: boolean
-  }> {
+  }>> {
     try {
       const tools = []
       // @ts-ignore
@@ -784,7 +809,7 @@ export class McpServerComposer {
    */
   public async callTool (toolName: string, args: any = {}): Promise<any> {
     try {
-      const toolInfo = this.findTool(toolName)
+      const toolInfo = await this.findTool(toolName)
       if (!toolInfo) {
         throw new Error(`工具未找到: ${toolName}`)
       }
@@ -836,8 +861,8 @@ export class McpServerComposer {
    * @param toolName 工具名称
    * @returns 是否存在
    */
-  public hasToolAvailable (toolName: string): boolean {
-    return this.findTool(toolName) !== null
+  public async hasToolAvailable (toolName: string): Promise<boolean> {
+    return (await this.findTool(toolName)) !== null
   }
 
   private getRegisteredTools () {
