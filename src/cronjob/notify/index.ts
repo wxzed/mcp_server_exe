@@ -2,8 +2,8 @@ import { sendDesktopNotification } from './desktop'
 import { sendEmailNotification } from './email'
 
 // 发送通知的函数
-export async function sendNotification (notifyConfigs, data) {
-  console.log(JSON.stringify(data, null, 2))
+export async function sendNotify (notifyConfigs, data) {
+  // console.log(JSON.stringify(data, null, 2))
 
   for (const notifyConfig of notifyConfigs) {
     if (notifyConfig.type === 'desktop') {

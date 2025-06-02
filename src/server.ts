@@ -4,7 +4,7 @@ const { loadServerConfig } = require('./tools/serverConfig.js')
 const { McpRouterServer } = require('./mcpRouterServer')
 const { WebSocketServer } = require('./webSocketServer')
 const { cronjob } = require('./cronjob/index')
-import { formatLog } from './utils/console' 
+import { formatLog } from './utils/console'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
@@ -265,14 +265,14 @@ async function startServer () {
       const routerServer = new McpRouterServer(serverInfo, {
         port: config.port,
         host: config.host ?? '0.0.0.0',
-        transportType: 'stdio' // 强制使用stdio模式
+        transportType: config.transport as 'sse' | 'stdio'
       })
       currentServer = routerServer
 
       // 导入配置并启动服务器
       await routerServer.importMcpConfig(mcpJSON, configureMcp)
       await routerServer.start()
-  
+
       cronjob(cliArgs.cronjob, currentServer.getActiveServer()._client)
 
       formatLog('INFO', '定时任务服务器已启动')

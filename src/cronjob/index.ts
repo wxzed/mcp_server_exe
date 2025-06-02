@@ -6,5 +6,5 @@ export const cronjob = (configPathOrStr: string,client:any) => {
   // 遍历任务并设置定时器
   config.tasks.forEach(task => scheduleTask(task,client))
   // 提示程序已启动
-  console.log('定时任务已设置')
+  // console.log('定时任务已设置')
 }

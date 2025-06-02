@@ -57,30 +57,26 @@ export class McpRouterServer {
 
     // 初始化默认服务器实例
     if (this.transportType === 'sse') {
-      this.defaultSseComposer = new McpServerComposer(this.baseServerInfo)
-      this.defaultSseServer = this.defaultSseComposer.server
-    }else if(this.transportType === 'stdio'){
-      this.stdioComposer = new McpServerComposer(this.baseServerInfo)
-      this.stdioServer = this.stdioComposer.server
-      this.stdioTransport = new StdioServerTransport()
+      this.initSseServer()
+    } else if (this.transportType === 'stdio') {
+      this.initStdioServer()
     }
+  }
 
+  initSseServer () {
+    this.defaultSseComposer = new McpServerComposer(this.baseServerInfo)
+    this.defaultSseServer = this.defaultSseComposer.server
+  }
+
+  initStdioServer () {
+    this.stdioComposer = new McpServerComposer(this.baseServerInfo)
+    this.stdioServer = this.stdioComposer.server
+    this.stdioTransport = new StdioServerTransport()
   }
 
   private async setupRoutes () {
     if (this.transportType === 'stdio') {
       formatLog('INFO', 'Initializing server in stdio mode...')
-      this.stdioComposer = new McpServerComposer(this.baseServerInfo)
-      this.stdioServer = this.stdioComposer.server
-      this.stdioTransport = new StdioServerTransport()
-
-      if (this.parsedConfig) {
-        await this._applyConfigurationToComposer(
-          this.stdioComposer,
-          this.stdioServer,
-          this.parsedConfig.configureMcp
-        )
-      }
 
       this.stdioServer.connect(this.stdioTransport)
       formatLog('INFO', 'Server initialized and connected in stdio mode')
@@ -98,8 +94,8 @@ export class McpRouterServer {
     }
 
     this.app.use((req, res, next) => {
-      req.setTimeout(240000*10)
-      res.setTimeout(240000*10)
+      req.setTimeout(240000 * 10)
+      res.setTimeout(240000 * 10)
       next()
     })
 
@@ -113,7 +109,11 @@ export class McpRouterServer {
       const transport = new ExpressSSEServerTransport('/sessions')
 
       if (this.parsedConfig) {
-        await this._applyConfigurationToComposer(composer, server, this.parsedConfig.configureMcp)
+        await this._applyConfigurationToComposer(
+          composer,
+          server,
+          this.parsedConfig.configureMcp
+        )
       }
 
       server.connect(transport)
@@ -425,6 +425,7 @@ export class McpRouterServer {
       if (this.transportType === 'stdio' && this.stdioServer) {
         formatLog('INFO', 'Closing stdio McpServer...')
         try {
+          await this.stdioTransport?.close()
           await this.stdioServer.close()
         } catch (error) {
           formatLog(
