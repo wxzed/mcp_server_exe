@@ -1,7 +1,6 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Operation } from '../config';
+import { Operation } from '../config'
 
-export async function executeOperation(client: Client, operation: Operation) {
+export async function executeOperation (client: any, operation: Operation) {
   switch (operation.type) {
     // case 'listPrompts':
     //   return await client.listPrompts();
@@ -17,13 +16,10 @@ export async function executeOperation(client: Client, operation: Operation) {
     //     uri: operation.uri
     //   });
     case 'listTools':
-      return await client.listTools();
+      return await client.listTools()
     case 'callTool':
-      return await client.callTool({
-        name: operation.name,
-        arguments: operation.arguments
-      });
+      return await client.callTool(operation.name, operation.arguments)
     default:
-      throw new Error(`未知的操作类型: ${operation.type}`);
+      throw new Error(`未知的操作类型: ${operation.type}`)
   }
-} 
+}

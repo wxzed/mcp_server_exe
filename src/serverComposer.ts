@@ -735,8 +735,9 @@ export class McpServerComposer {
     fullName: string
   } | null> {
     try {
-      const tools = this.getRegisteredTools()
+      const tools = this.getRegisteredTools();
       for (const [name, tool] of Object.entries(tools)) {
+        console.log(name,tool,toolName)
         if (
           name === toolName ||
           name.endsWith(`${this.namespace}${toolName}`)

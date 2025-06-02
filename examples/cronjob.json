@@ -5,6 +5,12 @@
             "operations": [
                 {
                     "type": "listTools"
+                },
+                {
+                    "type": "callTool",
+                    "name": "get_product_hunt_url",
+                    "arguments": { 
+                    }
                 }
             ],
             "notify": [

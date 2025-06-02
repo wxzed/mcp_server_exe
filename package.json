@@ -14,7 +14,7 @@
         "test-custom-config": "node scripts/test-custom-config.js",
         "test-packaged-app": "node scripts/test-packaged-app.js",
         "dev-ws": "tsx src/server.ts --mcp-config mcp-test.json --ws wss://api.xiaozhi.me/mcp/?token=xx",
-        "dev-cronjob": "tsx src/server.ts --cronjob ./examples/cronjob.json --mcp-js C:\\Users\\38957\\Documents\\GitHub\\mcp_server_exe\\examples\\product-hunt\\custom-mcp-config.js"
+        "dev-cronjob": "tsx src/server.ts --cronjob ./examples/cronjob.json --mcp-js ./examples/product-hunt/custom-mcp-config.js"
     },
     "bin": "dist/server.js",
     "pkg": {
