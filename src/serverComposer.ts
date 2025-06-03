@@ -20,6 +20,7 @@ import {
 } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
+import createDatabase from './utils/database'
 
 const NAMESPACE_SEPARATOR = '::'
 
@@ -106,15 +107,16 @@ export class McpServerComposer {
     // 绑定工具方法
     // @ts-ignore
     this.server._client = {
-      callTool: (toolName: string, args: any) => this.callTool(toolName, args),
-      hasToolAvailable: (toolName: string) => this.hasToolAvailable(toolName),
-      listTools: () => this.listTools(),
-      findTool: (toolName: string) => this.findTool(toolName),
-      listPrompts: () => this.listPrompts(),
-      getPrompt: (promptName: string, args: any) =>
+      callTool: async(toolName: string, args: any) => this.callTool(toolName, args),
+      hasToolAvailable:async (toolName: string) => this.hasToolAvailable(toolName),
+      listTools: async() => this.listTools(),
+      findTool:async (toolName: string) => this.findTool(toolName),
+      listPrompts:async () => this.listPrompts(),
+      getPrompt:async (promptName: string, args: any) =>
         this.getPrompt(promptName, args),
-      listResources: () => this.listResources(),
-      readResource: (resourceName: string) => this.readResource(resourceName)
+      listResources:async () => this.listResources(),
+      readResource:async (resourceName: string) => this.readResource(resourceName),
+      createDatabase: createDatabase
     }
   }
 
@@ -735,7 +737,7 @@ export class McpServerComposer {
     fullName: string
   } | null> {
     try {
-      const tools = this.getRegisteredTools();
+      const tools = this.getRegisteredTools()
       for (const [name, tool] of Object.entries(tools)) {
         // console.log(name,tool,toolName)
         if (
@@ -775,11 +777,13 @@ export class McpServerComposer {
   /**
    * 列出所有已注册的工具
    */
-  public async listTools (): Promise<Array<{
-    name: string
-    description: string
-    needsClient: boolean
-  }>> {
+  public async listTools (): Promise<
+    Array<{
+      name: string
+      description: string
+      needsClient: boolean
+    }>
+  > {
     try {
       const tools = []
       // @ts-ignore

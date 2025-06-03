@@ -357,12 +357,9 @@ export class McpRouterServer {
 
       formatLog(
         'INFO',
-        `\n\nConceptual MCP Server Config (new instance per SSE connection): ${JSON.stringify(
-          mcpConfigDisplay,
-          null,
-          2
-        )}\n\n`
+        `\n\nConceptual MCP Server Config (new instance per SSE connection): `
       )
+      console.log('\n\n' + JSON.stringify(mcpConfigDisplay, null, 2) + '\n\n')
       formatLog(
         'INFO',
         `\n\nMCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`

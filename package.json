@@ -1,21 +1,23 @@
 {
     "name": "mcp_server_exe",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
     "scripts": {
         "build": "tsc",
+        "postbuild": "copyfiles -f node_modules/node-notifier/vendor/**/* executables/notifier/",
         "start": "node dist/server.js --port 3002 --mcp-config ./examples/mcp.json",
         "dev": "tsx src/server.ts --port 3002 --mcp-config ./examples/mcp-sse.json",
         "package-mac-intel": "pkg . --targets node18-macos-x64 --output executables/mcp_server-macos-x64",
         "package-mac-arm": "pkg . --targets node18-macos-arm64 --output executables/mcp_server-macos-arm64",
-        "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server-win-x64.exe",
+        "package-win": "pkg . --targets node18-win-x64 --output executables/mcp_server-win-x64.exe  && npm run postbuild",
         "start-with-config": "node dist/server.js --mcp-js ./examples/test-config.js",
         "test-custom-config": "node scripts/test-custom-config.js",
         "test-packaged-app": "node scripts/test-packaged-app.js",
         "dev-ws": "tsx src/server.ts --mcp-config mcp-test.json --ws wss://api.xiaozhi.me/mcp/?token=xx",
-        "dev-cronjob": "tsx src/server.ts --cronjob ./examples/cronjob.json --mcp-js ./examples/product-hunt/custom-mcp-config.js"
-    },
+        "dev-cronjob": "tsx src/server.ts --cronjob ./examples/cronjob.json --mcp-js ./examples/product-hunt/custom-mcp-config.js",
+        "test-database": "executables/mcp_server-win-x64.exe --mcp-js examples/notify-database/database.js --cronjob examples/notify-database/cronjob.json"
+     },
     "bin": "dist/server.js",
     "pkg": {
         "targets": [
@@ -26,7 +28,9 @@
         "outputPath": "executables",
         "assets": [
             "dist/**/*",
-            "src/**/*"
+            "src/**/*",
+            "node_modules/node-notifier/vendor/**/*",
+            "node_modules/sql.js/dist/sql-wasm.wasm"
         ]
     },
     "keywords": [
@@ -49,14 +53,16 @@
         "cors": "^2.8.5",
         "dotenv": "^16.4.1",
         "express": "^4.18.2",
-        "uuid": "^11.1.0",
-        "ws": "^8.18.2",
         "node-cron": "^4.0.7",
-        "node-notifier": "^10.0.1"
+        "node-notifier": "^10.0.1",
+        "sql.js": "^1.13.0",
+        "uuid": "^11.1.0",
+        "ws": "^8.18.2"
     },
     "devDependencies": {
         "@types/express": "^4.17.21",
         "@types/node": "^20.17.50",
+        "copyfiles": "^2.4.1",
         "pkg": "^5.8.1",
         "ts-node": "^10.9.2",
         "tsx": "^4.19.4",

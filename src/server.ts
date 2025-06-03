@@ -291,7 +291,7 @@ async function startServer () {
     }
     formatLog('INFO', '服务已成功启动或重启。')
   } catch (error) {
-    formatLog('ERROR', '启动服务器时发生错误:')
+    formatLog('ERROR', '启动服务器时发生错误:' + error)
     currentServer = null // 如果启动失败，确保 currentServer 为空
   }
 }
