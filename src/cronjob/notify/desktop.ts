@@ -1,5 +1,6 @@
 import notifier from 'node-notifier'
 import path from 'path'
+import fs from 'fs'
 
 export function sendDesktopNotification (title, message, icon) {
   let data: any = {
@@ -12,18 +13,26 @@ export function sendDesktopNotification (title, message, icon) {
   if (icon) {
     data.icon = icon
   }
- 
+
   // 修正二进制路径（打包后）
   // @ts-ignore
   if (process.pkg) {
-    const vendorPath = path.join(path.dirname(process.execPath), 'notifier')
-  
+    let vendorPath = path.join(path.dirname(process.execPath), 'notifier')
+
+    if (!fs.existsSync(vendorPath)) {
+      vendorPath = path.join(path.dirname(process.cwd()), 'notifier')
+    }
+
+    if (!fs.existsSync(vendorPath)) {
+      vendorPath = path.dirname(process.execPath)
+    }
+
     notifier.notify(
       {
         ...data,
         // 显式指定二进制路径
         notifuPath: path.join(vendorPath, 'notifu.exe'),
-        snoreToastPath: path.join(vendorPath, 'snoretoast-x64.exe')
+        snoreToastPath: path.join(vendorPath, 'snoretoast.exe')
       },
       (err: any, response: any) => {
         if (err) console.error('桌面通知失败:', err)

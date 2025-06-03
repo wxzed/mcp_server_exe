@@ -368,6 +368,7 @@ export class McpRouterServer {
 
     this.httpServer.on('error', error => {
       formatLog('ERROR', `HTTP server error: ${error.message}`)
+      throw error
     })
   }
 
