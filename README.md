@@ -1,7 +1,7 @@
 ![MCP EXE](./assets/image.png)
 
 # MCP Server.exe
-> Cursor 的 MCP 启动器 - MCP For Cursor
+> 小智 & Cursor 的 MCP 启动器 - MCP For Cursor&xiaozhi
 
 MCP Server.exe 是一个强大的可执行服务器，它不仅能够运行标准的 MCP (Model Context Protocol) 服务，更提供了丰富的高级功能：
 
