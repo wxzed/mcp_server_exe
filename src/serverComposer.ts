@@ -107,15 +107,18 @@ export class McpServerComposer {
     // 绑定工具方法
     // @ts-ignore
     this.server._client = {
-      callTool: async(toolName: string, args: any) => this.callTool(toolName, args),
-      hasToolAvailable:async (toolName: string) => this.hasToolAvailable(toolName),
-      listTools: async() => this.listTools(),
-      findTool:async (toolName: string) => this.findTool(toolName),
-      listPrompts:async () => this.listPrompts(),
-      getPrompt:async (promptName: string, args: any) =>
+      callTool: async (toolName: string, args: any, options?: any) =>
+        this.callTool(toolName, args, options),
+      hasToolAvailable: async (toolName: string) =>
+        this.hasToolAvailable(toolName),
+      listTools: async () => this.listTools(),
+      findTool: async (toolName: string) => this.findTool(toolName),
+      listPrompts: async () => this.listPrompts(),
+      getPrompt: async (promptName: string, args: any) =>
         this.getPrompt(promptName, args),
-      listResources:async () => this.listResources(),
-      readResource:async (resourceName: string) => this.readResource(resourceName),
+      listResources: async () => this.listResources(),
+      readResource: async (resourceName: string) =>
+        this.readResource(resourceName),
       createDatabase: createDatabase
     }
   }
@@ -529,7 +532,11 @@ export class McpServerComposer {
           }
 
           // 创建工具执行函数
-          const toolExecutor = async (args: any, client?: Client) => {
+          const toolExecutor = async (
+            args: any,
+            client?: Client,
+            options?: any
+          ) => {
             let needToClose = false
             let toolClient = client
 
@@ -560,10 +567,14 @@ export class McpServerComposer {
               )
 
               try {
-                const result = await toolClient.callTool({
-                  name: tool.name, // 调用原始工具名
-                  arguments: args
-                })
+                const result = await toolClient.callTool(
+                  {
+                    name: tool.name, // 调用原始工具名
+                    arguments: args
+                  },
+                  undefined,
+                  options
+                )
                 return result as CallToolResult
               } catch (error) {
                 throw new Error(`Tool execution failed: ${error.message}`)
@@ -812,7 +823,11 @@ export class McpServerComposer {
    * @param args 工具参数
    * @returns 工具执行结果
    */
-  public async callTool (toolName: string, args: any = {}): Promise<any> {
+  public async callTool (
+    toolName: string,
+    args: any = {},
+    options?: any
+  ): Promise<any> {
     try {
       const toolInfo = await this.findTool(toolName)
       if (!toolInfo) {
@@ -846,14 +861,14 @@ export class McpServerComposer {
         const client = new Client(clientItem.clientInfo)
         try {
           await client.connect(this.createTransport(clientItem.config))
-          const result = await tool.chainExecutor(args, client)
+          const result = await tool.chainExecutor(args, client, options)
           return result
         } finally {
           await client.close()
         }
       } else {
         // 本地工具直接调用
-        return await tool.callback(args)
+        return await tool.callback(args, options)
       }
     } catch (error) {
       await formatLog('ERROR', `工具调用失败: ${error.message}`)
