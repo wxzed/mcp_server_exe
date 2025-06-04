@@ -23,6 +23,7 @@ import { formatLog } from './utils/console'
 import createDatabase from './utils/database'
 
 const NAMESPACE_SEPARATOR = '::'
+const TIMEOUT = 60000 * 120
 
 type ConnectionConfig =
   | {
@@ -390,10 +391,14 @@ export class McpServerComposer {
                   clientsMap.set(foundClientName, client)
                 }
 
-                result = await registeredTool.chainExecutor(step.args, client)
+                result = await registeredTool.chainExecutor(step.args, client,{
+                  timeout:TIMEOUT
+                })
               } else {
                 // 本地工具直接调用
-                result = await registeredTool.callback(step.args)
+                result = await registeredTool.callback(step.args,{
+                  timeout:TIMEOUT
+                })
               }
 
               // 确保结果不是undefined
