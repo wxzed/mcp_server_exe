@@ -2,6 +2,8 @@
  * Configure MCP server resources, tools, and prompts
  */
 function configureMcp(server, ResourceTemplate, z) {
+    // todo 扩展 server.database()
+    // 
     // Configure Echo resource
     server.resource(
         "echo",
