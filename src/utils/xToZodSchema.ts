@@ -3,7 +3,8 @@ interface Field {
   name: string
   type: 'string' | 'number' | 'boolean' | 'date' | 'enum'
   description?: string
-  isOptional: boolean
+  isOptional?: boolean
+  defaultValue?: any
   options?: string[] // 用于enum类型
 }
 
@@ -14,7 +15,10 @@ interface ToolDefinition {
 }
 
 // 将字段转换为Zod Schema
-export function fieldsToZodSchema(fields: Field[], asCode: boolean = true): string | Record<string, any> {
+export function fieldsToZodSchema (
+  fields: Field[],
+  asCode: boolean = true
+): string | Record<string, any> {
   if (!asCode) {
     // 返回Zod对象
     const zodObj: Record<string, any> = {}
@@ -22,28 +26,32 @@ export function fieldsToZodSchema(fields: Field[], asCode: boolean = true): stri
       let zodField: any
       switch (field.type) {
         case 'string':
-          zodField = (require('zod').z.string())
+          zodField = require('zod').z.string()
           break
         case 'number':
-          zodField = (require('zod').z.number())
+          zodField = require('zod').z.number()
           break
         case 'boolean':
-          zodField = (require('zod').z.boolean())
+          zodField = require('zod').z.boolean()
           break
         case 'date':
-          zodField = (require('zod').z.date())
+          zodField = require('zod').z.date()
           break
         case 'enum':
-          zodField = (require('zod').z.enum(field.options || []))
+          zodField = require('zod').z.enum(field.options || [])
           break
         default:
-          zodField = (require('zod').z.unknown())
+          zodField = require('zod').z.unknown()
       }
       if (field.isOptional) {
         zodField = zodField.optional()
       }
       if (field.description) {
         zodField = zodField.describe(field.description)
+      }
+      //默认值
+      if (field.defaultValue) {
+        zodField = zodField.default(field.defaultValue)
       }
       zodObj[field.name] = zodField
     })
@@ -67,7 +75,8 @@ export function fieldsToZodSchema(fields: Field[], asCode: boolean = true): stri
         zodField = 'z.date()'
         break
       case 'enum':
-        const enumValues = field.options?.map(opt => `'${opt}'`).join(', ') || ''
+        const enumValues =
+          field.options?.map(opt => `'${opt}'`).join(', ') || ''
         zodField = `z.enum([${enumValues}])`
         break
       default:
@@ -78,6 +87,9 @@ export function fieldsToZodSchema(fields: Field[], asCode: boolean = true): stri
     }
     if (field.description) {
       zodField += `.describe('${field.description}')`
+    }
+    if (field.defaultValue) {
+      zodField += `.default('${field.defaultValue}')`
     }
     schemaCode += `    ${field.name}: ${zodField},\n`
   })
