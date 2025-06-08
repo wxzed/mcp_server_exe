@@ -14,7 +14,7 @@ interface ToolDefinition {
 }
 
 // 将字段转换为Zod Schema
-function fieldsToZodSchema (fields: Field[]): string {
+export function fieldsToZodSchema (fields: Field[]): string {
   let schemaCode = '{\n'
 
   fields.forEach(field => {
@@ -99,12 +99,13 @@ export function createDatabaseTool (
   toolHandler: (args: any) => any
 ) {
   console.log('createDatabaseTool', name, description, fields, toolHandler)
-  const toolCode = generateToolCode({
-    name,description,fields
-  });
 
-  
-
+  const schema = fieldsToZodSchema(fields)
+  return {
+    name,
+    description,
+    schema
+  }
 }
 
 // 生成参数示例

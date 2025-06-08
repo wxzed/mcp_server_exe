@@ -189,8 +189,7 @@ const loadConfig = (config: any) => {
 let { mcpJSON, serverInfo } = loadConfig(config)
 
 // 加载配置文件
-let configureMcp = null,
-  databaseTool = null
+let configureMcp = null;
 
 const loadCustomConfig = () => {
   if (customConfigPath && fs.existsSync(customConfigPath)) {
@@ -203,11 +202,12 @@ const loadCustomConfig = () => {
       const customModule = require(customConfigFullPath)
 
       if (
-        customModule.databaseTool &&
-        typeof customModule.databaseTool === 'function'
+        customModule.mcpPlugin &&
+        typeof customModule.mcpPlugin === 'function'
       ) {
-        formatLog('INFO', '发现 databaseTool 函数，将用于配置 MCP 服务器')
-        databaseTool = customModule.databaseTool
+        formatLog('INFO', '发现 mcpPlugin 函数，将用于配置 MCP 服务器')
+        configureMcp = customModule.mcpPlugin
+        return true
       }
 
       if (

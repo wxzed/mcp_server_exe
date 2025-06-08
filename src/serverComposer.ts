@@ -21,7 +21,7 @@ import {
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
 import createDatabase from './utils/database'
-import { createDatabaseTool } from './tools/databaseTool'
+
 
 const NAMESPACE_SEPARATOR = '::'
 const TIMEOUT = 60000 * 120
@@ -121,8 +121,7 @@ export class McpServerComposer {
       listResources: async () => this.listResources(),
       readResource: async (resourceName: string) =>
         this.readResource(resourceName),
-      createDatabase: createDatabase,
-      createDatabaseTool: createDatabaseTool
+      createDatabase: createDatabase 
     }
   }
 

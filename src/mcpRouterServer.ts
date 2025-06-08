@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 import type { Server } from 'http'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { fieldsToZodSchema } from './utils/xToZodSchema'
 
 const NAMESPACE_SEPARATOR = '.'
 
@@ -212,6 +213,8 @@ export class McpRouterServer {
     composer.namespace = this.parsedConfig.namespace
 
     if (typeof configureMcp === 'function') {
+      // @ts-ignore
+      z._fieldsToZodSchema = fieldsToZodSchema
       configureMcp(server, ResourceTemplate, z)
     }
 
