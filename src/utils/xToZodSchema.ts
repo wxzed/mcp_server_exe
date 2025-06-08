@@ -14,13 +14,45 @@ interface ToolDefinition {
 }
 
 // 将字段转换为Zod Schema
-export function fieldsToZodSchema (fields: Field[]): string {
+export function fieldsToZodSchema(fields: Field[], asCode: boolean = true): string | Record<string, any> {
+  if (!asCode) {
+    // 返回Zod对象
+    const zodObj: Record<string, any> = {}
+    fields.forEach(field => {
+      let zodField: any
+      switch (field.type) {
+        case 'string':
+          zodField = (require('zod').z.string())
+          break
+        case 'number':
+          zodField = (require('zod').z.number())
+          break
+        case 'boolean':
+          zodField = (require('zod').z.boolean())
+          break
+        case 'date':
+          zodField = (require('zod').z.date())
+          break
+        case 'enum':
+          zodField = (require('zod').z.enum(field.options || []))
+          break
+        default:
+          zodField = (require('zod').z.unknown())
+      }
+      if (field.isOptional) {
+        zodField = zodField.optional()
+      }
+      if (field.description) {
+        zodField = zodField.describe(field.description)
+      }
+      zodObj[field.name] = zodField
+    })
+    return zodObj
+  }
+  // 原有代码字符串逻辑
   let schemaCode = '{\n'
-
   fields.forEach(field => {
     let zodField = ''
-
-    // 根据字段类型生成对应的Zod验证器
     switch (field.type) {
       case 'string':
         zodField = 'z.string()'
@@ -35,27 +67,20 @@ export function fieldsToZodSchema (fields: Field[]): string {
         zodField = 'z.date()'
         break
       case 'enum':
-        const enumValues =
-          field.options?.map(opt => `'${opt}'`).join(', ') || ''
+        const enumValues = field.options?.map(opt => `'${opt}'`).join(', ') || ''
         zodField = `z.enum([${enumValues}])`
         break
       default:
         zodField = 'z.unknown()'
     }
-
-    // 添加可选标记
     if (field.isOptional) {
       zodField += '.optional()'
     }
-
-    // 添加描述
     if (field.description) {
       zodField += `.describe('${field.description}')`
     }
-
     schemaCode += `    ${field.name}: ${zodField},\n`
   })
-
   schemaCode += '  }'
   return schemaCode
 }
