@@ -189,7 +189,7 @@ const loadConfig = (config: any) => {
 let { mcpJSON, serverInfo } = loadConfig(config)
 
 // 加载配置文件
-let configureMcp = null
+let configureMcp = null;
 
 const loadCustomConfig = () => {
   if (customConfigPath && fs.existsSync(customConfigPath)) {
@@ -200,6 +200,15 @@ const loadCustomConfig = () => {
       // 清除require缓存以确保重新加载最新的文件
       delete require.cache[require.resolve(customConfigFullPath)]
       const customModule = require(customConfigFullPath)
+
+      if (
+        customModule.mcpPlugin &&
+        typeof customModule.mcpPlugin === 'function'
+      ) {
+        formatLog('INFO', '发现 mcpPlugin 函数，将用于配置 MCP 服务器')
+        configureMcp = customModule.mcpPlugin
+        return true
+      }
 
       if (
         customModule.configureMcp &&
@@ -260,6 +269,7 @@ async function startServer () {
       )
       currentServer = wsServer // 将新实例赋值给 currentServer
       await wsServer.start()
+      formatLog('INFO', 'MCP Server Started Successfully')
     } else if (cliArgs.cronjob) {
       // 创建一个mcprouterserver的stdio模式
       const routerServer = new McpRouterServer(serverInfo, {
@@ -275,7 +285,7 @@ async function startServer () {
 
       cronjob(cliArgs.cronjob, currentServer.getActiveServer()._client)
 
-      formatLog('INFO', '定时任务服务器已启动')
+      formatLog('INFO', 'MCP Server Started Successfully')
     } else {
       // 常规模式
       const routerServer = new McpRouterServer(serverInfo, {
@@ -288,11 +298,12 @@ async function startServer () {
 
       await routerServer.importMcpConfig(mcpJSON, configureMcp) // 使用更新后的全局 mcpJSON
       routerServer.start()
+      formatLog('INFO', 'MCP Server Started Successfully')
     }
-    formatLog('INFO', '服务已成功启动或重启。')
   } catch (error) {
-    formatLog('ERROR', '启动服务器时发生错误:')
+    formatLog('ERROR', '启动服务器时发生错误:' + error)
     currentServer = null // 如果启动失败，确保 currentServer 为空
+    throw error
   }
 }
 
@@ -324,6 +335,7 @@ function debounceRestart (delay: number) {
         'ERROR',
         `重新加载配置或重启服务时发生错误: ${reloadError.message}`
       )
+      throw reloadError
     }
   }, delay)
 }

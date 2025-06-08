@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 import type { Server } from 'http'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { fieldsToZodSchema } from './utils/xToZodSchema'
 
 const NAMESPACE_SEPARATOR = '.'
 
@@ -212,6 +213,8 @@ export class McpRouterServer {
     composer.namespace = this.parsedConfig.namespace
 
     if (typeof configureMcp === 'function') {
+      // @ts-ignore
+      z._fieldsToZodSchema = fieldsToZodSchema
       configureMcp(server, ResourceTemplate, z)
     }
 
@@ -357,12 +360,9 @@ export class McpRouterServer {
 
       formatLog(
         'INFO',
-        `\n\nConceptual MCP Server Config (new instance per SSE connection): ${JSON.stringify(
-          mcpConfigDisplay,
-          null,
-          2
-        )}\n\n`
+        `\n\nConceptual MCP Server Config (new instance per SSE connection): `
       )
+      console.log('\n\n' + JSON.stringify(mcpConfigDisplay, null, 2) + '\n\n')
       formatLog(
         'INFO',
         `\n\nMCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`
@@ -371,6 +371,7 @@ export class McpRouterServer {
 
     this.httpServer.on('error', error => {
       formatLog('ERROR', `HTTP server error: ${error.message}`)
+      throw error
     })
   }
 

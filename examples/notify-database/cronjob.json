@@ -1,0 +1,23 @@
+{
+    "tasks": [
+        {
+            "schedule": "*/10 * * * * *",
+            "operations": [ 
+                {
+                    "type": "callTool",
+                    "name": "custom-tool",
+                    "arguments": { 
+                        "message": "hello"
+                    }
+                }
+            ],
+            "notify": [
+                {
+                    "type": "desktop",
+                    "title": "任务执行结果",
+                    "icon": ""
+                }
+            ]
+        }
+    ]
+}

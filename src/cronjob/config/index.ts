@@ -1,5 +1,5 @@
 const fs = require('fs')
-
+import { formatLog } from '../../utils/console'
 interface TransportConfig {
   command: string
   args: string[]
@@ -34,7 +34,7 @@ export function loadConfig (configPathOrStr: string): Config {
     }
     return cronjobJSON
   } catch (error) {
-    throw new Error(`读取或解析配置文件失败: ${error.message}`)
+    formatLog('ERROR', `读取或解析配置文件失败: ${error.message}`)
   }
 }
 
