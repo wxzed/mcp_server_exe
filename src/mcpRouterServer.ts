@@ -12,6 +12,7 @@ import type { Server } from 'http'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { fieldsToZodSchema } from './utils/xToZodSchema'
+import { openCursorLink } from './utils/cursorLink'
 
 const NAMESPACE_SEPARATOR = '.'
 
@@ -51,6 +52,7 @@ export class McpRouterServer {
       port?: number
       host?: string
       transportType?: 'sse' | 'stdio'
+      cursorLink?: boolean
     }
   ) {
     this.baseServerInfo = serverInfo
@@ -335,20 +337,17 @@ export class McpRouterServer {
 
     const port = this.serverOptions.port ?? 3003
     const host = this.serverOptions.host ?? '0.0.0.0'
+    const conceptualServerName = this.baseServerInfo.name || 'mcpSessionServer'
 
     this.httpServer = this.app.listen(port, host, () => {
       const hostAddress = host === '0.0.0.0' ? '127.0.0.1' : host
       const serverUrl = `http://${hostAddress}:${port}`
 
-      const conceptualServerName =
-        this.baseServerInfo.name || 'mcpSessionServer'
-
       const mcpConfigDisplay = {
         mcpServers: {
           [conceptualServerName]: {
             url: serverUrl,
-            description:
-              'Connect to this URL for an SSE-based MCP session. Each connection gets a dedicated server instance.'
+            type: 'sse'
           }
         }
       }
@@ -362,7 +361,17 @@ export class McpRouterServer {
         'INFO',
         `\n\nConceptual MCP Server Config (new instance per SSE connection): `
       )
+
       console.log('\n\n' + JSON.stringify(mcpConfigDisplay, null, 2) + '\n\n')
+      console.log(this.serverOptions)
+      if (this.serverOptions.cursorLink) {
+        // 打开url
+        openCursorLink(
+          conceptualServerName,
+          mcpConfigDisplay.mcpServers[conceptualServerName]
+        )
+      }
+
       formatLog(
         'INFO',
         `\n\nMCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`

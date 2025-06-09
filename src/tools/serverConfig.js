@@ -25,6 +25,7 @@ function loadServerConfig(customConfig = {}, cliArgs = {}) {
         ...defaultConfig,
         ...customConfig
     };
+    console.log(cliArgs)
 
     // 如果存在命令行参数，它们优先级最高
     if (cliArgs.serverName) config.serverName = cliArgs.serverName;
@@ -37,6 +38,7 @@ function loadServerConfig(customConfig = {}, cliArgs = {}) {
     if (cliArgs.homepage) config.homepage = cliArgs.homepage;
     if (cliArgs.transport) config.transport = cliArgs.transport;
     if (cliArgs.mcpConfig) config.mcpConfig = cliArgs.mcpConfig;
+    if (cliArgs.cursorLink!=undefined) config.cursorLink = cliArgs.cursorLink;
     return config;
 }
 

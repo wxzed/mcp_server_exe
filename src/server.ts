@@ -28,6 +28,7 @@ interface CliArgs {
   mcpConfig?: string
   ws?: string // 新增WebSocket URL参数
   cronjob?: string // 新增cronjob参数
+  cursorLink?: boolean
 }
 
 // 创建 cliArgs 对象
@@ -55,6 +56,13 @@ for (let i = 0; i < args.length; i++) {
     i++
     continue
   }
+
+  if (args[i] === '--cursor-link') {
+    cliArgs.cursorLink = true
+    i++
+    continue
+  }
+
   if (args[i] === '--server-name' && i + 1 < args.length) {
     cliArgs.serverName = args[i + 1]
     i++
@@ -189,7 +197,7 @@ const loadConfig = (config: any) => {
 let { mcpJSON, serverInfo } = loadConfig(config)
 
 // 加载配置文件
-let configureMcp = null;
+let configureMcp = null
 
 const loadCustomConfig = () => {
   if (customConfigPath && fs.existsSync(customConfigPath)) {
@@ -292,7 +300,8 @@ async function startServer () {
         // 使用更新后的全局 serverInfo
         port: config.port,
         host: config.host ?? '0.0.0.0',
-        transportType: config.transport as 'sse' | 'stdio'
+        transportType: config.transport as 'sse' | 'stdio',
+        cursorLink: cliArgs.cursorLink
       })
       currentServer = routerServer // 将新实例赋值给 currentServer
 
