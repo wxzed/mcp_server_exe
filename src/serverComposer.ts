@@ -22,7 +22,6 @@ import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
 import createDatabase from './utils/database'
 
-
 const NAMESPACE_SEPARATOR = '::'
 const TIMEOUT = 60000 * 120
 
@@ -121,7 +120,7 @@ export class McpServerComposer {
       listResources: async () => this.listResources(),
       readResource: async (resourceName: string) =>
         this.readResource(resourceName),
-      createDatabase: createDatabase 
+      createDatabase: createDatabase
     }
   }
 
@@ -279,7 +278,7 @@ export class McpServerComposer {
               Object.entries(toolChain.steps[0].args).map(([key, value]) => [
                 key,
                 {
-                  type: typeof value,
+                  type: Array.isArray(value) ? 'array' : typeof value,
                   default: value
                 }
               ])
