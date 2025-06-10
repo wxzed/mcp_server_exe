@@ -10,9 +10,10 @@ export async function sendNotify (notifyConfigs, data) {
   // console.log(JSON.stringify(data, null, 2))
   try {
     for (const notifyConfig of notifyConfigs) {
+      const title = notifyConfig.title,
+        icon = notifyConfig.icon
+      let text = ''
       if (notifyConfig?.type === 'desktop') {
-        let text = ''
-
         if (Array.isArray(data)) {
           for (const d of data) {
             if (d.operation.name) text += `${d.operation.name}\n`
@@ -25,18 +26,29 @@ export async function sendNotify (notifyConfigs, data) {
           }
         }
 
-        sendDesktopNotification(notifyConfig.title, text, notifyConfig.icon)
+        sendDesktopNotification(title, text, icon)
       } else if (notifyConfig?.type === 'email') {
         await sendEmailNotification(
           notifyConfig.to,
           notifyConfig.subject,
           JSON.stringify(data, null, 2)
         )
-      } else {
+      } else if (notifyConfig?.type == 'ntfy') {
         await fetch(notifyConfig.url || notifyConfig, {
           method: 'POST',
           body: JSON.stringify(data),
           headers: { 'Content-Type': 'application/json' }
+        })
+
+        fetch(notifyConfig.url, {
+          method: 'POST',
+          body: JSON.stringify({
+            topic: notifyConfig.topic,
+            message: text,
+            title,
+            tags: notifyConfig.tags || [],
+            priority: notifyConfig.priority || 3
+          })
         })
       }
     }

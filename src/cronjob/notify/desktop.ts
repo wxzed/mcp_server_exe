@@ -1,6 +1,7 @@
 import notifier from 'node-notifier'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 
 export function sendDesktopNotification (title, message, icon) {
   let data: any = {
@@ -27,13 +28,19 @@ export function sendDesktopNotification (title, message, icon) {
       vendorPath = path.dirname(process.execPath)
     }
 
-    console.log(path.join(vendorPath, 'notifu.exe'))
+    const platform = os.platform()
+    let customPath
+
+    if (platform === 'win32') {
+      customPath = path.join(vendorPath, 'snoretoast.exe')
+    } else if (platform === 'darwin') {
+      customPath = path.join(vendorPath, 'terminal-notifier')
+    }
+
     notifier.notify(
       {
         ...data,
-        // 显式指定二进制路径
-        notifuPath: path.join(vendorPath, 'notifu.exe'),
-        snoreToastPath: path.join(vendorPath, 'snoretoast.exe')
+        customPath
       },
       (err: any, response: any) => {
         if (err) console.error('桌面通知失败:', err)
