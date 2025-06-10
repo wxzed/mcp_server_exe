@@ -27,6 +27,7 @@ export function sendDesktopNotification (title, message, icon) {
       vendorPath = path.dirname(process.execPath)
     }
 
+    console.log(path.join(vendorPath, 'notifu.exe'))
     notifier.notify(
       {
         ...data,
@@ -36,14 +37,14 @@ export function sendDesktopNotification (title, message, icon) {
       },
       (err: any, response: any) => {
         if (err) console.error('桌面通知失败:', err)
-        else console.log('桌面通知发送成功')
+        else console.log('桌面通知发送成功',response)
       }
     )
   } else {
     // 开发环境正常使用
     notifier.notify(data, (err: any, response: any) => {
       if (err) console.error('桌面通知失败:', err)
-      else console.log('桌面通知发送成功')
+      else console.log('桌面通知发送成功',response)
     })
   }
 }
