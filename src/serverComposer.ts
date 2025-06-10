@@ -21,6 +21,7 @@ import {
 import { jsonSchemaToZod } from './utils/schemaConverter'
 import { formatLog } from './utils/console'
 import createDatabase from './utils/database'
+import { sendNotify } from './cronjob/notify'
 
 const NAMESPACE_SEPARATOR = '::'
 const TIMEOUT = 60000 * 120
@@ -120,7 +121,9 @@ export class McpServerComposer {
       listResources: async () => this.listResources(),
       readResource: async (resourceName: string) =>
         this.readResource(resourceName),
-      createDatabase: createDatabase
+      createDatabase: createDatabase,
+      sendNotify: async (notifyConfigs: any, data: any) =>
+        await sendNotify(notifyConfigs, data)
     }
   }
 
