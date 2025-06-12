@@ -19,7 +19,7 @@ import {
   type StdioServerParameters
 } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { jsonSchemaToZod } from './utils/schemaConverter'
-import { formatLog } from './utils/console'
+import { formatLog, LogLevel, LogCategory } from './utils/console'
 import createDatabase from './utils/database'
 import { sendNotify } from './cronjob/notify'
 
@@ -123,7 +123,13 @@ export class McpServerComposer {
         this.readResource(resourceName),
       createDatabase: createDatabase,
       sendNotify: async (notifyConfigs: any, data: any) =>
-        await sendNotify(notifyConfigs, data)
+        await sendNotify(notifyConfigs, data),
+      log: async (
+        level: LogLevel,
+        message: string,
+        category?: LogCategory,
+        sendNotification?: boolean
+      ) => formatLog(level, message, category, sendNotification)
     }
   }
 
@@ -144,7 +150,7 @@ export class McpServerComposer {
     } catch (error) {
       if (retryCount >= 2) {
         await formatLog(
-          'ERROR',
+          LogLevel.ERROR,
           `Connection failed after 2 retries: ${
             config.type === 'sse' ? config.url : config.params.command
           } -> ${clientInfo.name}\n` +
@@ -155,7 +161,7 @@ export class McpServerComposer {
       }
 
       await formatLog(
-        'ERROR',
+        LogLevel.ERROR,
         `Connection failed: ${
           config.type === 'sse' ? config.url : config.params.command
         } -> ${clientInfo.name}\n` +
@@ -172,7 +178,7 @@ export class McpServerComposer {
     }
 
     await formatLog(
-      'INFO',
+      LogLevel.INFO,
       `Successfully connected to server: ${
         config.type === 'sse' ? config.url : config.params.command
       } (${clientInfo.name})`
@@ -183,14 +189,17 @@ export class McpServerComposer {
     this.targetClients.set(name, { clientInfo, config })
 
     if (skipRegister) {
-      await formatLog('INFO', `Skipping capability registration: ${name}`)
+      await formatLog(
+        LogLevel.INFO,
+        `Skipping capability registration: ${name}`
+      )
       return
     }
 
     const capabilities = await targetClient.getServerCapabilities()
 
     await formatLog(
-      'INFO',
+      LogLevel.INFO,
       `Starting server capability registration: ${name} ${JSON.stringify(
         capabilities,
         null,
@@ -210,12 +219,12 @@ export class McpServerComposer {
         this.composeTools(tools.tools, name)
 
         await formatLog(
-          'INFO',
+          LogLevel.INFO,
           `Tool registration completed [${name}]: ${tools.tools.length} tools in total`
         )
       } catch (error) {
         await formatLog(
-          'ERROR',
+          LogLevel.ERROR,
           `Tool registration failed: ${name} ${JSON.stringify(error, null, 2)}`
         )
       }
@@ -227,12 +236,12 @@ export class McpServerComposer {
         this.composeResources(resources.resources, name)
 
         await formatLog(
-          'INFO',
+          LogLevel.INFO,
           `Resource registration completed [${name}]: ${resources.resources.length} resources in total`
         )
       } catch (error) {
         await formatLog(
-          'ERROR',
+          LogLevel.ERROR,
           `Resource registration failed: ${name} ${JSON.stringify(
             error,
             null,
@@ -248,12 +257,12 @@ export class McpServerComposer {
         this.composePrompts(prompts.prompts, name)
 
         await formatLog(
-          'INFO',
+          LogLevel.INFO,
           `Prompt registration completed [${name}]: ${prompts.prompts.length} prompts in total`
         )
       } catch (error) {
         await formatLog(
-          'ERROR',
+          LogLevel.ERROR,
           `Prompt registration failed: ${name} ${JSON.stringify(
             error,
             null,
@@ -264,7 +273,7 @@ export class McpServerComposer {
     }
 
     await formatLog(
-      'INFO',
+      LogLevel.INFO,
       `All capabilities registration completed for server ${name}`
     )
     targetClient.close()
@@ -325,9 +334,10 @@ export class McpServerComposer {
               throw new Error(`Tool not found: ${step.toolName}`)
             }
 
-            await await formatLog(
-              'DEBUG',
+            await formatLog(
+              LogLevel.DEBUG,
               `Executing chain step ${i}: ${foundToolName}\n`,
+              LogCategory.TOOL,
               sendNotification
             )
 
@@ -345,15 +355,17 @@ export class McpServerComposer {
                       step.args[key] = value
                     } else {
                       await formatLog(
-                        'INFO',
+                        LogLevel.INFO,
                         `Output mapping path "${path}" returned undefined for step ${i}`,
+                        LogCategory.TOOL,
                         sendNotification
                       )
                     }
                   } catch (error) {
                     await formatLog(
-                      'ERROR',
+                      LogLevel.ERROR,
                       `Failed to map output for step ${i}: ${error.message}`,
+                      LogCategory.TOOL,
                       sendNotification
                     )
                   }
@@ -408,8 +420,9 @@ export class McpServerComposer {
               results.push(result || { content: [{ type: 'text', text: '' }] })
             } catch (error) {
               await formatLog(
-                'ERROR',
+                LogLevel.ERROR,
                 `Step ${i} (${foundToolName}) execution failed: ${error.message}`,
+                LogCategory.TOOL,
                 sendNotification
               )
               // 在错误时添加一个空结果
@@ -420,8 +433,9 @@ export class McpServerComposer {
           }
 
           await formatLog(
-            'DEBUG',
+            LogLevel.DEBUG,
             `Chain execution completed`,
+            LogCategory.TOOL,
             sendNotification
           )
 
@@ -446,8 +460,9 @@ export class McpServerComposer {
             }
           } catch (error) {
             await formatLog(
-              'ERROR',
+              LogLevel.ERROR,
               `Failed to process output results: ${error.message}`,
+              LogCategory.TOOL,
               sendNotification
             )
             outputResults = []
@@ -481,7 +496,7 @@ export class McpServerComposer {
       }, obj)
     } catch (error) {
       formatLog(
-        'ERROR',
+        LogLevel.ERROR,
         `Failed to get nested value for path "${path}": ${error.message}`
       )
       return undefined
@@ -524,7 +539,7 @@ export class McpServerComposer {
 
           if (existingTools[namespacedToolName]) {
             formatLog(
-              'INFO',
+              LogLevel.INFO,
               `Tool ${namespacedToolName} already exists, skipping...`
             )
             continue
@@ -570,7 +585,7 @@ export class McpServerComposer {
               }
 
               await formatLog(
-                'DEBUG',
+                LogLevel.DEBUG,
                 `Calling tool: ${tool.name} from ${name}\n`
               )
 
@@ -593,7 +608,7 @@ export class McpServerComposer {
                   await toolClient.close()
                 } catch (closeError) {
                   await formatLog(
-                    'ERROR',
+                    LogLevel.ERROR,
                     `Failed to close client connection: ${closeError.message}`
                   )
                 }
@@ -622,7 +637,7 @@ export class McpServerComposer {
               tool.name
 
             formatLog(
-              'INFO',
+              LogLevel.INFO,
               `Successfully registered tool: ${namespacedToolName}`
             )
           } catch (error) {
@@ -631,18 +646,18 @@ export class McpServerComposer {
             )
           }
         } catch (error) {
-          formatLog('ERROR', `Failed to process tool: ${error.message}`)
+          formatLog(LogLevel.ERROR, `Failed to process tool: ${error.message}`)
           throw error // 重新抛出错误以便上层处理
         }
       }
 
       this.clientTools.set(name, toolSet)
       formatLog(
-        'INFO',
+        LogLevel.INFO,
         `Successfully registered ${toolSet.size} tools for ${name}`
       )
     } catch (error) {
-      formatLog('ERROR', `Failed to compose tools: ${error.message}`)
+      formatLog(LogLevel.ERROR, `Failed to compose tools: ${error.message}`)
       throw error // 重新抛出错误以便上层处理
     }
   }
@@ -720,7 +735,7 @@ export class McpServerComposer {
       this.targetClients.delete(name)
 
       formatLog(
-        'ERROR',
+        LogLevel.ERROR,
         `Server connection lost:\n` +
           `- Name: ${name}\n` +
           `- Type: ${config.type}\n` +
@@ -768,7 +783,7 @@ export class McpServerComposer {
       }
       return null
     } catch (error) {
-      formatLog('ERROR', `查找工具失败: ${error.message}`)
+      formatLog(LogLevel.ERROR, `查找工具失败: ${error.message}`)
       return null
     }
   }
@@ -820,7 +835,7 @@ export class McpServerComposer {
       }
       return tools
     } catch (error) {
-      formatLog('ERROR', `列出工具失败: ${error.message}`)
+      formatLog(LogLevel.ERROR, `列出工具失败: ${error.message}`)
       return []
     }
   }
@@ -843,7 +858,7 @@ export class McpServerComposer {
       }
 
       const { tool, fullName } = toolInfo
-      await formatLog('DEBUG', `正在调用工具: ${fullName}`)
+      await formatLog(LogLevel.DEBUG, `正在调用工具: ${fullName}`)
 
       if (tool.needsClient) {
         // 查找支持该工具的客户端
@@ -879,7 +894,7 @@ export class McpServerComposer {
         return await tool.callback(args, options)
       }
     } catch (error) {
-      await formatLog('ERROR', `工具调用失败: ${error.message}`)
+      await formatLog(LogLevel.ERROR, `工具调用失败: ${error.message}`)
       throw error
     }
   }

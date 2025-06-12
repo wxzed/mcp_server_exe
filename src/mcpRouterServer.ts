@@ -6,7 +6,7 @@ import type { McpServerType } from './utils/schemas'
 import express from 'express'
 import cors from 'cors'
 import type { Express } from 'express'
-import { formatLog } from './utils/console'
+import { formatLog, LogLevel } from './utils/console'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 import type { Server } from 'http'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -79,10 +79,10 @@ export class McpRouterServer {
 
   private async setupRoutes () {
     if (this.transportType === 'stdio') {
-      formatLog('INFO', 'Initializing server in stdio mode...')
+      formatLog(LogLevel.INFO, 'Initializing server in stdio mode...')
 
       this.stdioServer.connect(this.stdioTransport)
-      formatLog('INFO', 'Server initialized and connected in stdio mode')
+      formatLog(LogLevel.INFO, 'Server initialized and connected in stdio mode')
       return
     }
 
@@ -106,7 +106,7 @@ export class McpRouterServer {
     this.app.use(express.json())
 
     this.app.get('/', async (_, res) => {
-      formatLog('INFO', 'New SSE connection request received.')
+      formatLog(LogLevel.INFO, 'New SSE connection request received.')
       const composer = new McpServerComposer(this.baseServerInfo)
       const server = composer.server
       const transport = new ExpressSSEServerTransport('/sessions')
@@ -123,21 +123,24 @@ export class McpRouterServer {
 
       transport.onclose = () => {
         formatLog(
-          'INFO',
+          LogLevel.INFO,
           `SSE transport for session ${transport.sessionId} closed.`
         )
         const sessionData = this.sseSessions.get(transport.sessionId)
         if (sessionData) {
           formatLog(
-            'INFO',
+            LogLevel.INFO,
             `Closing McpServer and cleaning up resources for session ${transport.sessionId}.`
           )
           sessionData.server.close()
           this.sseSessions.delete(transport.sessionId)
-          formatLog('INFO', `Session ${transport.sessionId} fully cleaned up.`)
+          formatLog(
+            LogLevel.INFO,
+            `Session ${transport.sessionId} fully cleaned up.`
+          )
         } else {
           formatLog(
-            'INFO',
+            LogLevel.INFO,
             `onclose called for session ${transport.sessionId}, but session not found in map.`
           )
         }
@@ -149,7 +152,7 @@ export class McpRouterServer {
         transport
       })
       formatLog(
-        'INFO',
+        LogLevel.INFO,
         `Session ${transport.sessionId} opened and McpServer instance created.`
       )
       transport.handleSSERequest(res)
@@ -160,7 +163,7 @@ export class McpRouterServer {
       const sessionData = this.sseSessions.get(sessionId)
 
       if (!sessionData) {
-        formatLog('INFO', `Invalid or unknown session ID: ${sessionId}`)
+        formatLog(LogLevel.INFO, `Invalid or unknown session ID: ${sessionId}`)
         res.status(404).send('Session not found or invalid session ID')
         return
       }
@@ -174,7 +177,10 @@ export class McpRouterServer {
 
     this.app.use(
       (err: Error, _, res: express.Response, next: express.NextFunction) => {
-        formatLog('ERROR', `Unhandled error: ${err.message} ${err.stack ?? ''}`)
+        formatLog(
+          LogLevel.ERROR,
+          `Unhandled error: ${err.message} ${err.stack ?? ''}`
+        )
         res.status(500).send('Internal server error')
         next()
       }
@@ -208,7 +214,10 @@ export class McpRouterServer {
     configureMcp: Function | null
   ) {
     if (!this.parsedConfig) {
-      formatLog('DEBUG', 'No parsed config available to apply to composer.')
+      formatLog(
+        LogLevel.DEBUG,
+        'No parsed config available to apply to composer.'
+      )
       return
     }
 
@@ -316,7 +325,7 @@ export class McpRouterServer {
       this.stdioServer
     ) {
       formatLog(
-        'INFO',
+        LogLevel.INFO,
         'Applying new configuration to existing stdio server instance.'
       )
       await this._applyConfigurationToComposer(
@@ -331,7 +340,7 @@ export class McpRouterServer {
     await this.setupRoutes()
 
     if (this.transportType === 'stdio') {
-      formatLog('INFO', 'Server running in stdio mode.')
+      formatLog(LogLevel.INFO, 'Server running in stdio mode.')
       return
     }
 
@@ -358,12 +367,12 @@ export class McpRouterServer {
       }
 
       formatLog(
-        'INFO',
-        `\n\nConceptual MCP Server Config (new instance per SSE connection): `
+        LogLevel.INFO,
+        `Conceptual MCP Server Config (new instance per SSE connection): `
       )
 
       console.log('\n\n' + JSON.stringify(mcpConfigDisplay, null, 2) + '\n\n')
-      console.log(this.serverOptions)
+      console.log(this.serverOptions, '\n\n')
       if (this.serverOptions.cursorLink) {
         // 打开url
         openCursorLink(
@@ -373,20 +382,20 @@ export class McpRouterServer {
       }
 
       formatLog(
-        'INFO',
-        `\n\nMCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`
+        LogLevel.INFO,
+        `MCP Router (SSE) listening on ${serverUrl}. Send GET to / for new session, POST to /sessions?sessionId=... for messages.\n\n`
       )
     })
 
     this.httpServer.on('error', error => {
-      formatLog('ERROR', `HTTP server error: ${error.message}`)
+      formatLog(LogLevel.ERROR, `HTTP server error: ${error.message}`)
       throw error
     })
   }
 
   async close (): Promise<void> {
     try {
-      formatLog('INFO', 'Shutting down McpRouterServer...')
+      formatLog(LogLevel.INFO, 'Shutting down McpRouterServer...')
 
       if (this.transportType === 'sse') {
         // 关闭默认SSE服务器
@@ -397,7 +406,7 @@ export class McpRouterServer {
             this.defaultSseComposer = null
           } catch (error) {
             formatLog(
-              'ERROR',
+              LogLevel.ERROR,
               `Error closing default SSE server: ${(error as Error).message}`
             )
           }
@@ -408,13 +417,13 @@ export class McpRouterServer {
         ).map(async sessionData => {
           try {
             formatLog(
-              'INFO',
+              LogLevel.INFO,
               `Closing McpServer for session ${sessionData.transport.sessionId}...`
             )
             await sessionData.server.close()
           } catch (error) {
             formatLog(
-              'ERROR',
+              LogLevel.ERROR,
               `Error closing McpServer for session ${
                 sessionData.transport.sessionId
               }: ${(error as Error).message}`
@@ -425,7 +434,7 @@ export class McpRouterServer {
 
         if (this.sseSessions.size > 0) {
           formatLog(
-            'INFO',
+            LogLevel.INFO,
             `${this.sseSessions.size} SSE sessions still in map after close attempts. Forcibly clearing.`
           )
           this.sseSessions.clear()
@@ -433,13 +442,13 @@ export class McpRouterServer {
       }
 
       if (this.transportType === 'stdio' && this.stdioServer) {
-        formatLog('INFO', 'Closing stdio McpServer...')
+        formatLog(LogLevel.INFO, 'Closing stdio McpServer...')
         try {
           await this.stdioTransport?.close()
           await this.stdioServer.close()
         } catch (error) {
           formatLog(
-            'ERROR',
+            LogLevel.ERROR,
             `Error closing stdio McpServer: ${(error as Error).message}`
           )
         }
@@ -449,14 +458,17 @@ export class McpRouterServer {
       }
 
       if (this.httpServer) {
-        formatLog('INFO', 'Closing HTTP server...')
+        formatLog(LogLevel.INFO, 'Closing HTTP server...')
         await new Promise<void>((resolve, reject) => {
           this.httpServer!.close(err => {
             if (err) {
-              formatLog('ERROR', `Error closing HTTP server: ${err.message}`)
+              formatLog(
+                LogLevel.ERROR,
+                `Error closing HTTP server: ${err.message}`
+              )
               reject(err)
             } else {
-              formatLog('INFO', 'HTTP server closed successfully.')
+              formatLog(LogLevel.INFO, 'HTTP server closed successfully.')
               this.httpServer = null
               resolve()
             }
@@ -464,10 +476,10 @@ export class McpRouterServer {
         })
       }
 
-      formatLog('INFO', 'McpRouterServer shut down completely.')
+      formatLog(LogLevel.INFO, 'McpRouterServer shut down completely.')
     } catch (error) {
       formatLog(
-        'ERROR',
+        LogLevel.ERROR,
         `Critical error during McpRouterServer shutdown: ${
           (error as Error).message
         }`
