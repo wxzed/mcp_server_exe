@@ -6,7 +6,7 @@ import type { McpServerType } from './utils/schemas'
 import express from 'express'
 import cors from 'cors'
 import type { Express } from 'express'
-import { formatLog, LogLevel } from './utils/console'
+import { formatLog, LogCategory, LogLevel } from './utils/console'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
 import type { Server } from 'http'
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -46,7 +46,7 @@ export class McpRouterServer {
   private defaultSseComposer: McpServerComposer | null = null
   private defaultSseServer: McpServer | null = null
 
-  constructor (
+  constructor(
     serverInfo: Implementation,
     private readonly serverOptions: {
       port?: number
@@ -66,18 +66,18 @@ export class McpRouterServer {
     }
   }
 
-  initSseServer () {
+  initSseServer() {
     this.defaultSseComposer = new McpServerComposer(this.baseServerInfo)
     this.defaultSseServer = this.defaultSseComposer.server
   }
 
-  initStdioServer () {
+  initStdioServer() {
     this.stdioComposer = new McpServerComposer(this.baseServerInfo)
     this.stdioServer = this.stdioComposer.server
     this.stdioTransport = new StdioServerTransport()
   }
 
-  private async setupRoutes () {
+  private async setupRoutes() {
     if (this.transportType === 'stdio') {
       formatLog(LogLevel.INFO, 'Initializing server in stdio mode...')
 
@@ -97,8 +97,8 @@ export class McpRouterServer {
     }
 
     this.app.use((req, res, next) => {
-      req.setTimeout(240000 * 10)
-      res.setTimeout(240000 * 10)
+      req.setTimeout(0)  // 设置为0表示永不超时
+      res.setTimeout(0)  // 设置为0表示永不超时
       next()
     })
 
@@ -187,7 +187,7 @@ export class McpRouterServer {
     )
   }
 
-  parseConfig (config: any) {
+  parseConfig(config: any) {
     const mcpServers = config?.mcpServers || {}
 
     const targetServers: McpServerType[] = []
@@ -200,15 +200,15 @@ export class McpRouterServer {
         params: serverConfig.url
           ? {}
           : {
-              ...serverConfig
-            }
+            ...serverConfig
+          }
       }
       targetServers.push(targetServer)
     }
     return targetServers
   }
 
-  private async _applyConfigurationToComposer (
+  private async _applyConfigurationToComposer(
     composer: McpServerComposer,
     server: McpServer,
     configureMcp: Function | null
@@ -267,7 +267,7 @@ export class McpRouterServer {
     if (this.parsedConfig.toolsFilter.length > 0) {
       for (const name in registeredTools) {
         if (!this.parsedConfig.toolsFilter.includes(name)) {
-          ;(registeredTools[name] as any).disable()
+          ; (registeredTools[name] as any).disable()
         }
       }
     }
@@ -275,13 +275,13 @@ export class McpRouterServer {
     if (Array.isArray(this.parsedConfig.toolChains)) {
       for (const toolChain of this.parsedConfig.toolChains) {
         if (registeredTools[toolChain.name]) {
-          ;(registeredTools[toolChain.name] as any).enable()
+          ; (registeredTools[toolChain.name] as any).enable()
         }
       }
     }
   }
 
-  public getActiveServer (): McpServer {
+  public getActiveServer(): McpServer {
     if (this.transportType === 'stdio' && this.stdioServer) {
       return this.stdioServer
     }
@@ -291,7 +291,7 @@ export class McpRouterServer {
     throw new Error('No active server available')
   }
 
-  async importMcpConfig (config: any, configureMcp: Function | null) {
+  async importMcpConfig(config: any, configureMcp: Function | null) {
     const targetServers = this.parseConfig(config)
     const toolChains = config?.toolChains || []
     const namespace = config.namespace || NAMESPACE_SEPARATOR
@@ -336,7 +336,7 @@ export class McpRouterServer {
     }
   }
 
-  async start () {
+  async start() {
     await this.setupRoutes()
 
     if (this.transportType === 'stdio') {
@@ -371,8 +371,12 @@ export class McpRouterServer {
         `Conceptual MCP Server Config (new instance per SSE connection): `
       )
 
-      console.log('\n\n' + JSON.stringify(mcpConfigDisplay, null, 2) + '\n\n')
-      console.log(this.serverOptions, '\n\n')
+      formatLog(
+        LogLevel.OUTPUT,
+        JSON.stringify(mcpConfigDisplay, null, 2),
+        LogCategory.SYSTEM
+      )
+ 
       if (this.serverOptions.cursorLink) {
         // 打开url
         openCursorLink(
@@ -393,7 +397,7 @@ export class McpRouterServer {
     })
   }
 
-  async close (): Promise<void> {
+  async close(): Promise<void> {
     try {
       formatLog(LogLevel.INFO, 'Shutting down McpRouterServer...')
 
@@ -424,8 +428,7 @@ export class McpRouterServer {
           } catch (error) {
             formatLog(
               LogLevel.ERROR,
-              `Error closing McpServer for session ${
-                sessionData.transport.sessionId
+              `Error closing McpServer for session ${sessionData.transport.sessionId
               }: ${(error as Error).message}`
             )
           }
@@ -480,8 +483,7 @@ export class McpRouterServer {
     } catch (error) {
       formatLog(
         LogLevel.ERROR,
-        `Critical error during McpRouterServer shutdown: ${
-          (error as Error).message
+        `Critical error during McpRouterServer shutdown: ${(error as Error).message
         }`
       )
       throw error
