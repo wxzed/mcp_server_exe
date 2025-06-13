@@ -25,6 +25,7 @@ import { sendNotify } from './cronjob/notify'
 
 const NAMESPACE_SEPARATOR = '::'
 const TIMEOUT = 60000 * 120
+const DEFAULT_REQUEST_TIMEOUT_MSEC = 60000
 
 type ConnectionConfig =
   | {
@@ -139,14 +140,25 @@ export class McpServerComposer {
     skipRegister = false,
     retryCount = 0
   ): Promise<void> {
-    const targetClient = new Client(clientInfo)
+    const targetClient = new Client(clientInfo) 
+
+    // 用来调试的 - 发现mac上的路径，通过参数调用的exe路径有问题（需要用绝对路径）
+    await formatLog(
+      LogLevel.ERROR,
+      `当前工作目录: ${process.cwd()}\n` +
+      `可执行文件路径: ${process.execPath}\n` +
+      `启动参数: ${process.argv.join(' ')}`
+    )
+
     const transport =
       config.type === 'sse'
         ? new SSEClientTransport(config.url)
         : new StdioClientTransport(config.params)
 
     try {
-      await targetClient.connect(transport)
+      await targetClient.connect(transport, {
+        timeout: DEFAULT_REQUEST_TIMEOUT_MSEC //默认值
+      })
     } catch (error) {
       if (retryCount >= 2) {
         await formatLog(
@@ -155,6 +167,7 @@ export class McpServerComposer {
             config.type === 'sse' ? config.url : config.params.command
           } -> ${clientInfo.name}\n` +
             `Reason: ${(error as Error).message}\n` +
+            `Config: ${JSON.stringify(config)}\n` +
             `Skipping connection...`
         )
         return
@@ -166,14 +179,14 @@ export class McpServerComposer {
           config.type === 'sse' ? config.url : config.params.command
         } -> ${clientInfo.name}\n` +
           `Reason: ${(error as Error).message}\n` +
-          `Will retry in 15 seconds... (Attempt ${retryCount + 1}/2)`
+          `Will retry in 6 seconds... (Attempt ${retryCount + 1}/2)`
       )
 
       // If the connection fails, retry after 15 seconds
       return new Promise(resolve => {
         setTimeout(() => {
           resolve(this.add(config, clientInfo, skipRegister, retryCount + 1))
-        }, 15000)
+        }, 6000)
       })
     }
 
