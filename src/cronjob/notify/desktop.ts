@@ -43,7 +43,7 @@ export function sendDesktopNotification (title, message, icon) {
         customPath
       },
       (err: any, response: any) => {
-        if (err) console.error('桌面通知失败:', err)
+        if (err) console.error('桌面通知失败:customPath:',customPath, 'err:',err)
         else console.log('桌面通知发送成功',response)
       }
     )
