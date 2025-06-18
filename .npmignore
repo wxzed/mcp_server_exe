@@ -1,0 +1,33 @@
+# 测试文件
+test/
+__tests__/
+*.test.js
+
+# 开发配置
+.editorconfig
+.eslintrc
+.prettierrc
+
+# 构建工具
+webpack.config.js
+rollup.config.js
+
+# 其他
+.DS_Store
+.idea/
+.vscode/
+executables/
+node_modules/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+src/
+wsMcp.js
+examples/
+assets/
+tsconfig.json
+scripts/
+.github/
