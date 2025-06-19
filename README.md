@@ -17,6 +17,11 @@ MCP Server.exe is a powerful executable server that not only runs standard MCP (
 - Pluggable Tool System: Support dynamic loading and configuration of custom tools
 - Flexible Deployment: From standalone operation to distributed deployment, meeting various integration scenarios
 
+### Usage
+```bash
+npx mcp_exe --mcp-config xxx
+```
+
 ## 🎯 主要使用场景 | Main Usage Scenarios
 
 ### 1. WebSocket 连接模式 | WebSocket Connection Mode
@@ -219,6 +224,8 @@ mcpServer.stdin.write(JSON.stringify({
   // 发送请求到 MCP 服务器 | Send request to MCP server
 }));
 ```
+
+
 
 ## 📚 详细文档 | Detailed Documentation
 

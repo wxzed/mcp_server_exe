@@ -18,7 +18,7 @@ if (process.argv.length === 2) {
     console.log(`
 MCP Server CLI Tool v${require('../package.json').version}
 
-使用方法: mcp.exe [选项]
+使用方法: npx mcp_exe [选项]
 
 选项:
   --ws <url>             WebSocket 服务器地址
@@ -38,10 +38,10 @@ MCP Server CLI Tool v${require('../package.json').version}
   --help, -h            显示此帮助信息
 
 示例:
-  mcp.exe --port 3000 --mcp-config ./examples/mcp.json
-  mcp.exe --ws ws://localhost:8080
-  mcp.exe --mcp-js ./examples/custom-config.js
-  mcp.exe --cronjob ./examples/cronjob.json
+  npx mcp_exe --port 3000 --mcp-config ./examples/mcp.json
+  npx mcp_exe --ws ws://localhost:8080
+  npx mcp_exe --mcp-js ./examples/custom-config.js
+  npx mcp_exe --cronjob ./examples/cronjob.json
     `);
     process.exit(0);
 }
