@@ -1,0 +1,9 @@
+{
+    "mcpServers": {
+      "ws-lamp-bridge": {
+        "command": "python",
+        "args": ["ws_stdio_bridge.py"],
+        "transport": "stdio"
+      }
+    }
+  }

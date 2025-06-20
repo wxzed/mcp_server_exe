@@ -53,7 +53,7 @@ interface LogConfig {
 
 // 默认配置
 const defaultConfig: LogConfig = {
-  minLevel: LogLevel.INFO,
+  minLevel: LogLevel.TRACE,
   showTimestamp: true,
   showCategory: true,
   showColors: true
