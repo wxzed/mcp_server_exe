@@ -1,8 +1,11 @@
 {
-    "name": "mcp_server_exe",
-    "version": "0.11.3",
+    "name": "mcp_exe",
+    "version": "0.11.6",
     "description": "Turn MCP server into an executable file",
     "main": "dist/server.js",
+    "bin": {
+        "mcp_exe": "./bin/cli.js"
+    },
     "scripts": {
         "build": "tsc",
         "postbuild": "copyfiles -f node_modules/node-notifier/vendor/**/* executables/notifier/",
@@ -17,8 +20,8 @@
         "dev-ws": "tsx src/server.ts --mcp-config mcp-test.json --ws wss://api.xiaozhi.me/mcp/?token=xx",
         "dev-cronjob": "tsx src/server.ts --cronjob ./examples/cronjob.json --mcp-js ./examples/product-hunt/custom-mcp-config.js",
         "test-database": "executables/mcp_server-win-x64.exe --mcp-js examples/notify-database/database.js --cronjob examples/notify-database/cronjob.json"
-     },
-    "bin": "dist/server.js",
+    },
+
     "pkg": {
         "targets": [
             "node18-win-x64",
